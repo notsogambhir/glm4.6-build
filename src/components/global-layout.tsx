@@ -26,7 +26,7 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { logout, updateUserSelections } = useAuth();
-  const { getContextString } = useSidebarContext();
+  const { selectedProgram, selectedBatch, programs, batches } = useSidebarContext();
   const [activeView, setActiveView] = useState('dashboard');
 
   // Update active view based on current path
@@ -56,6 +56,31 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
       setActiveView(matchedView[1]);
     }
   }, [pathname]);
+
+  // Get display names for program and batch
+  const getProgramName = () => {
+    if (!selectedProgram) return '';
+    const program = programs.find(p => p.id === selectedProgram);
+    return program ? program.name : '';
+  };
+
+  const getBatchName = () => {
+    if (!selectedBatch) return '';
+    const batch = batches.find(b => b.id === selectedBatch);
+    return batch ? batch.name : '';
+  };
+
+  // Build display string
+  const getDisplayString = () => {
+    const parts = [];
+    const programName = getProgramName();
+    const batchName = getBatchName();
+    
+    if (programName) parts.push(programName);
+    if (batchName) parts.push(batchName);
+    
+    return parts.join(' - ');
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -110,7 +135,7 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900">
-                  {getContextString()}
+                  {getDisplayString() || 'Dashboard'}
                 </h1>
                 <p className="text-sm text-gray-600">
                   Welcome back, {user.name}

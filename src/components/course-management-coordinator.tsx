@@ -278,11 +278,16 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
     try {
       setLoading(true);
       
-      // Use relative URL to work in both development and production
-      const url = `/api/courses?batchId=${user.batchId}`;
+      // Build URL based on user role and batchId
+      let url = '/api/courses';
+      if (user.batchId) {
+        url += `?batchId=${user.batchId}`;
+      }
       
       console.log('=== FETCHING COURSES ===');
+      console.log('User:', user);
       console.log('User batchId:', user.batchId);
+      console.log('BatchId type:', typeof user.batchId);
       console.log('Fetching from URL:', url);
       
       const response = await fetch(url);
@@ -292,6 +297,7 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
       if (response.ok) {
         const data = await response.json();
         console.log('Courses fetched:', data.length);
+        console.log('Courses data:', data);
         setCourses(data);
       } else {
         console.error('Failed to fetch courses:', response.status);
@@ -306,10 +312,12 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
   };
 
   useEffect(() => {
+    console.log('useEffect triggered for fetchCourses, refreshKey:', refreshKey);
     fetchCourses();
   }, [user.batchId, refreshKey]);
 
   const handleCourseCreated = () => {
+    console.log('handleCourseCreated called, incrementing refreshKey');
     setRefreshKey(prev => prev + 1);
     setShowCreateForm(false);
     toast.success('Course created successfully!');

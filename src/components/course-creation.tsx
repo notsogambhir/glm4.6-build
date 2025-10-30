@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, BookOpen } from 'lucide-react';
+import { Plus, BookOpen, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSidebarContext } from '@/contexts/sidebar-context';
 
 interface User {
   id: string;
@@ -28,6 +29,28 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
   const [courseCode, setCourseCode] = useState('');
   const [courseName, setCourseName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingCourses, setExistingCourses] = useState<string[]>([]);
+  const { selectedBatch } = useSidebarContext();
+
+  // Fetch existing courses when batch changes
+  useEffect(() => {
+    if (selectedBatch) {
+      fetchExistingCourses();
+    }
+  }, [selectedBatch]);
+
+  const fetchExistingCourses = async () => {
+    try {
+      const response = await fetch(`/api/courses?batchId=${selectedBatch}`);
+      if (response.ok) {
+        const courses = await response.json();
+        const courseCodes = courses.map((course: any) => course.code);
+        setExistingCourses(courseCodes);
+      }
+    } catch (error) {
+      console.error('Error fetching existing courses:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,15 +60,28 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
       return;
     }
 
-    if (!user.programId || !user.batchId) {
-      toast.error("Please select a program and batch before creating a course");
+    // Check for duplicate course code
+    if (isCourseCodeDuplicate) {
+      toast.error(`Course code "${courseCode.toUpperCase()}" already exists in this batch`);
+      return;
+    }
+
+    // Check if user has a batch selected (from sidebar global state)
+    if (!selectedBatch) {
+      toast.error("Please select a batch from the sidebar before creating a course");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Simulate API call - replace with actual API endpoint
+      console.log('Creating course with data:', {
+        code: courseCode.toUpperCase(),
+        name: courseName.trim(),
+        batchId: selectedBatch,
+        semester: "1st",
+      });
+      
       const response = await fetch('/api/courses', {
         method: 'POST',
         headers: {
@@ -54,19 +90,25 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
         body: JSON.stringify({
           code: courseCode.toUpperCase(),
           name: courseName.trim(),
-          batchId: user.batchId,
+          batchId: selectedBatch,
           semester: "1st",
         }),
       });
 
+      console.log('Course creation response status:', response.status);
+      console.log('Course creation response ok:', response.ok);
+
       if (response.ok) {
+        console.log('Course created successfully, calling onCourseCreated callback');
         toast.success("Course created successfully");
         setCourseCode('');
         setCourseName('');
         onCourseCreated?.();
+        console.log('onCourseCreated callback called');
       } else {
         const error = await response.json();
-        toast.error(error.message || "Failed to create course");
+        console.error('Course creation failed:', error);
+        toast.error(error.error || error.message || "Failed to create course");
       }
     } catch (error) {
       console.error('Error creating course:', error);
@@ -75,6 +117,9 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
       setIsSubmitting(false);
     }
   };
+
+  const hasBatchSelected = !!selectedBatch;
+  const isCourseCodeDuplicate = existingCourses.includes(courseCode.toUpperCase());
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -88,6 +133,38 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Existing Courses Info */}
+        {hasBatchSelected && existingCourses.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <Info className="h-4 w-4 text-blue-600" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">Existing course codes in this batch:</p>
+                <p className="text-xs mt-1">{existingCourses.join(', ')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Batch Status */}
+        <div className="mb-6">
+          {hasBatchSelected ? (
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <Info className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-800">
+                Course will be created for your currently selected batch
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                Please select a batch from the sidebar to create courses
+              </span>
+            </div>
+          )}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="courseCode">Course Code</Label>
@@ -98,7 +175,14 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
               value={courseCode}
               onChange={(e) => setCourseCode(e.target.value.toUpperCase())}
               required
+              disabled={!hasBatchSelected}
+              className={isCourseCodeDuplicate ? "border-red-500 focus:border-red-500" : ""}
             />
+            {isCourseCodeDuplicate && (
+              <p className="text-xs text-red-600">
+                This course code already exists in this batch
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -110,13 +194,14 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
               value={courseName}
               onChange={(e) => setCourseName(e.target.value)}
               required
+              disabled={!hasBatchSelected}
             />
           </div>
 
           <div className="flex justify-center">
             <Button 
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasBatchSelected || isCourseCodeDuplicate}
               className="bg-red-600 hover:bg-red-700 text-white px-8 py-2 flex items-center gap-2 transition-colors"
             >
               {isSubmitting ? (

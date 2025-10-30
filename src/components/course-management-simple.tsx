@@ -3,11 +3,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Trash2, AlertTriangle, Edit } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BookOpen, Trash2, AlertTriangle, Edit, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { CourseEditModal } from '@/components/course-edit-modal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface User {
   id: string;
@@ -41,9 +53,217 @@ interface Course {
   };
 }
 
+interface CourseCategoryProps {
+  title: string;
+  courses: Course[];
+  status: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
+  defaultExpanded?: boolean;
+  onUpdateStatus: (courseId: string, newStatus: 'FUTURE' | 'ACTIVE' | 'COMPLETED') => void;
+  onDeleteCourse: (courseId: string, courseName: string) => void;
+  onEditCourse: (course: Course) => void;
+  isHighLevelUser: boolean;
+  updatingCourseId?: string;
+  deletingCourseId?: string;
+}
+
+function CourseCategory({ title, courses, status, defaultExpanded = false, onUpdateStatus, onDeleteCourse, onEditCourse, isHighLevelUser, updatingCourseId, deletingCourseId }: CourseCategoryProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  
+  const getStatusColor = (courseStatus: string) => {
+    switch (courseStatus) {
+      case 'FUTURE':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'COMPLETED':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusBadgeColor = (courseStatus: string) => {
+    switch (courseStatus) {
+      case 'FUTURE':
+        return 'bg-gray-50 text-gray-700 border-gray-300';
+      case 'ACTIVE':
+        return 'bg-green-50 text-green-700 border-green-300';
+      case 'COMPLETED':
+        return 'bg-blue-50 text-blue-700 border-blue-300';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-300';
+    }
+  };
+
+  const isUpdating = (courseId: string) => updatingCourseId === courseId;
+  const isDeleting = (courseId: string) => deletingCourseId === courseId;
+
+  const canDeleteCourse = (course: Course) => {
+    return course.status === 'FUTURE' || (course.status === 'COMPLETED' && course._count.enrollments === 0);
+  };
+
+  return (
+    <Card className="mb-4 transition-all duration-300">
+      <CardHeader 
+        className="cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+            <BookOpen className="h-5 w-5" />
+            {title} ({courses.length})
+          </div>
+        </CardTitle>
+      </CardHeader>
+      {isExpanded && (
+        <CardContent>
+          {courses.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              No {status.toLowerCase()} courses
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {courses.map((course) => (
+                <div 
+                  key={course.id} 
+                  className={`flex items-center justify-between p-3 border rounded-lg transition-all duration-300 ${
+                    isUpdating(course.id) 
+                      ? 'bg-yellow-50 border-yellow-200' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getStatusColor(course.status)} transition-colors duration-300`}>
+                      {isUpdating(course.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <BookOpen className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{course.name}</p>
+                      <p className="text-xs text-gray-600">{course.code} • {course.semester} Semester</p>
+                      <p className="text-xs text-gray-500">{course.batch?.program?.name || 'Unknown Program'} • {course.batch?.name || 'Unknown Batch'}</p>
+                      {status === 'ACTIVE' && course._count.enrollments > 0 && (
+                        <p className="text-xs text-green-600 font-medium">
+                          {course._count.enrollments} students enrolled
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">{course._count.enrollments} Students</Badge>
+                    <Badge variant="secondary" className="bg-red-50 text-red-700 border-red-200 text-xs">{course._count.courseOutcomes} COs</Badge>
+                    <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">{course._count.assessments} Assessments</Badge>
+                    <Badge className={`text-xs ${getStatusBadgeColor(course.status)}`}>
+                      {course.status}
+                    </Badge>
+                    {isHighLevelUser && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hover:bg-blue-50 hover:border-blue-300 text-blue-600 hover:text-blue-700"
+                        onClick={() => onEditCourse(course)}
+                        disabled={isUpdating(course.id) || isDeleting(course.id)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {isHighLevelUser && (
+                      <Select
+                        value={course.status}
+                        onValueChange={(value: 'FUTURE' | 'ACTIVE' | 'COMPLETED') => 
+                          onUpdateStatus(course.id, value)
+                        }
+                        disabled={isUpdating(course.id) || isDeleting(course.id)}
+                      >
+                        <SelectTrigger className="w-32 h-8 text-xs">
+                          {isUpdating(course.id) ? (
+                            <div className="flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Updating...</span>
+                            </div>
+                          ) : (
+                            <SelectValue />
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FUTURE">Future</SelectItem>
+                          <SelectItem value="ACTIVE">Active</SelectItem>
+                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <Link href={`/courses/${course.id}/manage`}>
+                      <Button variant="outline" size="sm" className="hover:bg-red-50 hover:border-red-300" disabled={isUpdating(course.id) || isDeleting(course.id)}>
+                        Manage
+                      </Button>
+                    </Link>
+                    {isHighLevelUser && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className={canDeleteCourse(course) ? "hover:bg-red-50 hover:border-red-300 text-red-600 hover:text-red-700" : "text-gray-400 cursor-not-allowed"}
+                            disabled={isUpdating(course.id) || isDeleting(course.id) || !canDeleteCourse(course)}
+                            title={canDeleteCourse(course) ? "Delete course" : "Cannot delete: Course is active with enrolled students"}
+                          >
+                            {isDeleting(course.id) ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        {canDeleteCourse(course) && (
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-red-500" />
+                                Delete Course
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete <strong>{course.name}</strong> ({course.code})?
+                                <br /><br />
+                                This action cannot be undone and will permanently delete:
+                                <ul className="list-disc list-inside mt-2 space-y-1">
+                                  <li>Course information and settings</li>
+                                  {course._count.courseOutcomes > 0 && <li>{course._count.courseOutcomes} course outcomes</li>}
+                                  {course._count.assessments > 0 && <li>{course._count.assessments} assessments</li>}
+                                  {course._count.enrollments > 0 && <li>{course._count.enrollments} student enrollments</li>}
+                                </ul>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => onDeleteCourse(course.id, course.name)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Course
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        )}
+                      </AlertDialog>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 export function CourseManagementAdmin({ user }: { user: User }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingCourseId, setUpdatingCourseId] = useState<string | null>(null);
   const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -51,16 +271,34 @@ export function CourseManagementAdmin({ user }: { user: User }) {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/courses');
+      
+      // Build URL based on user role and context
+      let url = '/api/courses';
+      
+      // For department users, use their collegeId
+      if (user.role === 'DEPARTMENT' && user.collegeId) {
+        url += `?collegeId=${user.collegeId}`;
+      }
+      
+      console.log('=== FETCHING COURSES FOR ADMIN ===');
+      console.log('User:', user);
+      console.log('Fetching from URL:', url);
+      
+      const response = await fetch(url);
+      
+      console.log('Response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Courses fetched:', data.length);
         setCourses(data);
       } else {
-        console.error('Failed to fetch courses');
+        console.error('Failed to fetch courses:', response.status);
+        toast.error('Failed to fetch courses');
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
+      toast.error('Error fetching courses');
     } finally {
       setLoading(false);
     }
@@ -68,13 +306,65 @@ export function CourseManagementAdmin({ user }: { user: User }) {
 
   useEffect(() => {
     fetchCourses();
-  }, []);
+  }, [user.collegeId]);
+
+  const handleUpdateStatus = async (courseId: string, newStatus: 'FUTURE' | 'ACTIVE' | 'COMPLETED') => {
+    try {
+      setUpdatingCourseId(courseId);
+      
+      // Find the current course to get its details for the success message
+      const currentCourse = courses.find(c => c.id === courseId);
+      const courseName = currentCourse?.name || 'Course';
+      
+      console.log('=== UPDATING COURSE STATUS ===');
+      console.log('Course ID:', courseId);
+      console.log('New Status:', newStatus);
+      
+      const response = await fetch(`/api/courses/${courseId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-HTTP-Method-Override': 'PATCH',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      console.log('Response status:', response.status);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        console.log('Update successful:', responseData);
+        
+        // Show appropriate success message based on status change
+        if (newStatus === 'ACTIVE') {
+          if (responseData.message && responseData.message.includes('automatic enrollment completed')) {
+            toast.success(`${courseName} is now active! Automatic enrollment has been processed.`);
+          } else {
+            const enrolledCount = responseData._count?.enrollments || 0;
+            toast.success(`${courseName} is now active! ${enrolledCount > 0 ? `${enrolledCount} students enrolled.` : ''}`);
+          }
+        } else if (newStatus === 'COMPLETED') {
+          toast.success(`${courseName} marked as completed!`);
+        } else if (newStatus === 'FUTURE') {
+          toast.success(`${courseName} moved to future courses!`);
+        }
+        
+        // Refresh the courses list to show the updated status
+        fetchCourses();
+      } else {
+        const errorData = await response.json();
+        console.error('Update failed:', errorData);
+        toast.error(errorData.message || `Failed to update course status`);
+      }
+    } catch (error) {
+      console.error('Error updating course status:', error);
+      toast.error('Error updating course status');
+    } finally {
+      setUpdatingCourseId(null);
+    }
+  };
 
   const handleDeleteCourse = async (courseId: string, courseName: string) => {
-    if (!confirm(`Are you sure you want to delete ${courseName}? This action cannot be undone.`)) {
-      return;
-    }
-
     try {
       setDeletingCourseId(courseId);
       
@@ -84,7 +374,7 @@ export function CourseManagementAdmin({ user }: { user: User }) {
 
       if (response.ok) {
         toast.success(`${courseName} has been deleted successfully!`);
-        setCourses(courses.filter(c => c.id !== courseId));
+        fetchCourses(); // Refresh the course list
       } else {
         const errorData = await response.json();
         toast.error(errorData.error || `Failed to delete course`);
@@ -113,22 +403,13 @@ export function CourseManagementAdmin({ user }: { user: User }) {
     setIsEditModalOpen(false);
   };
 
-  const canDeleteCourse = (course: Course) => {
-    return course.status === 'FUTURE' || (course.status === 'COMPLETED' && course._count.enrollments === 0);
-  };
+  // Group courses by status
+  const activeCourses = courses.filter(course => course.status === 'ACTIVE');
+  const futureCourses = courses.filter(course => course.status === 'FUTURE');
+  const completedCourses = courses.filter(course => course.status === 'COMPLETED');
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'FUTURE':
-        return 'bg-gray-100 text-gray-800';
-      case 'ACTIVE':
-        return 'bg-green-100 text-green-800';
-      case 'COMPLETED':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  // Check if user is high-level user for edit/delete permissions
+  const isHighLevelUser = ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(user.role);
 
   if (loading) {
     return (
@@ -146,74 +427,47 @@ export function CourseManagementAdmin({ user }: { user: User }) {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            All Courses ({courses.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {courses.length === 0 ? (
-            <div className="text-center py-8">
-              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
-              <p className="text-gray-600">No courses are available in the system.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {courses.map((course) => (
-                <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getStatusColor(course.status)}`}>
-                      <BookOpen className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{course.name}</h3>
-                      <p className="text-sm text-gray-600">{course.code} • {course.semester} Semester</p>
-                      <p className="text-xs text-gray-500">{course.batch.program.name} • {course.batch.name}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline">{course._count.enrollments} Students</Badge>
-                    <Badge variant="secondary">{course._count.courseOutcomes} COs</Badge>
-                    <Badge className={getStatusColor(course.status)}>{course.status}</Badge>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="hover:bg-blue-50 hover:border-blue-300 text-blue-600 hover:text-blue-700"
-                      onClick={() => handleEditCourse(course)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    
-                    <Link href={`/courses/${course.id}/manage`}>
-                      <Button variant="outline" size="sm">Manage</Button>
-                    </Link>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={canDeleteCourse(course) ? "text-red-600 hover:text-red-700 hover:bg-red-50" : "text-gray-400 cursor-not-allowed"}
-                      onClick={() => canDeleteCourse(course) && handleDeleteCourse(course.id, course.name)}
-                      disabled={deletingCourseId === course.id || !canDeleteCourse(course)}
-                      title={canDeleteCourse(course) ? "Delete course" : "Cannot delete: Course is active with enrolled students"}
-                    >
-                      {deletingCourseId === course.id ? (
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Active Courses */}
+      <CourseCategory
+        title="Active Courses"
+        courses={activeCourses}
+        status="ACTIVE"
+        defaultExpanded={true}
+        onUpdateStatus={handleUpdateStatus}
+        onDeleteCourse={handleDeleteCourse}
+        onEditCourse={handleEditCourse}
+        isHighLevelUser={isHighLevelUser}
+        updatingCourseId={updatingCourseId}
+        deletingCourseId={deletingCourseId}
+      />
+
+      {/* Future Courses */}
+      <CourseCategory
+        title="Future Courses"
+        courses={futureCourses}
+        status="FUTURE"
+        defaultExpanded={false}
+        onUpdateStatus={handleUpdateStatus}
+        onDeleteCourse={handleDeleteCourse}
+        onEditCourse={handleEditCourse}
+        isHighLevelUser={isHighLevelUser}
+        updatingCourseId={updatingCourseId}
+        deletingCourseId={deletingCourseId}
+      />
+
+      {/* Completed Courses */}
+      <CourseCategory
+        title="Completed Courses"
+        courses={completedCourses}
+        status="COMPLETED"
+        defaultExpanded={false}
+        onUpdateStatus={handleUpdateStatus}
+        onDeleteCourse={handleDeleteCourse}
+        onEditCourse={handleEditCourse}
+        isHighLevelUser={isHighLevelUser}
+        updatingCourseId={updatingCourseId}
+        deletingCourseId={deletingCourseId}
+      />
       
       <CourseEditModal
         course={editingCourse}

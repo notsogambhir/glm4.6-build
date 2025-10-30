@@ -7,38 +7,209 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const batchId = searchParams.get('batchId');
+    const collegeId = searchParams.get('collegeId');
     
-    if (!batchId) {
-      return NextResponse.json({ error: 'Batch ID is required' }, { status: 400 });
-    }
-
-    const courses = await db.course.findMany({
-      where: {
-        batchId: batchId
-      },
-      include: {
-        batch: {
-          include: {
-            program: {
-              select: {
-                name: true,
-                code: true
+    console.log('GET /api/courses called');
+    console.log('Batch ID from params:', batchId);
+    console.log('College ID from params:', collegeId);
+    
+    // Get the authenticated user to check permissions
+    const user = await getUserFromRequest(request);
+    console.log('Authenticated user:', user ? { id: user.id, role: user.role, batchId: user.batchId, collegeId: user.collegeId, departmentId: user.departmentId } : 'null');
+    
+    let courses;
+    
+    if (batchId) {
+      // If batchId is provided, get courses for that specific batch
+      // Verify user has access to this batch
+      if (!user) {
+        return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+      }
+      
+      // For program coordinators, verify they have access to this batch
+      if (user.role === 'PROGRAM_COORDINATOR') {
+        const batch = await db.batch.findUnique({
+          where: { id: batchId },
+          include: { program: true }
+        });
+        
+        if (!batch || batch.programId !== user.programId) {
+          return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+      }
+      
+      courses = await db.course.findMany({
+        where: {
+          batchId: batchId
+        },
+        include: {
+          batch: {
+            include: {
+              program: {
+                select: {
+                  name: true,
+                  code: true
+                }
               }
+            }
+          },
+          _count: {
+            select: {
+              courseOutcomes: true,
+              assessments: true,
+              enrollments: true
             }
           }
         },
-        _count: {
-          select: {
-            courseOutcomes: true,
-            assessments: true,
-            enrollments: true
-          }
+        orderBy: {
+          createdAt: 'desc'
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
+      });
+    } else if (collegeId) {
+      // If collegeId is provided, get courses from that college
+      if (!user) {
+        return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
       }
-    });
+      
+      courses = await db.course.findMany({
+        where: {
+          batch: {
+            program: {
+              collegeId: collegeId
+            }
+          }
+        },
+        include: {
+          batch: {
+            include: {
+              program: {
+                select: {
+                  name: true,
+                  code: true
+                }
+              }
+            }
+          },
+          _count: {
+            select: {
+              courseOutcomes: true,
+              assessments: true,
+              enrollments: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    } else {
+      // If no batchId, return courses based on user role
+      if (!user) {
+        return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+      }
+      
+      switch (user.role) {
+        case 'ADMIN':
+        case 'UNIVERSITY':
+          // Admin and University users can see all courses
+          courses = await db.course.findMany({
+            include: {
+              batch: {
+                include: {
+                  program: {
+                    select: {
+                      name: true,
+                      code: true
+                    }
+                  }
+                }
+              },
+              _count: {
+                select: {
+                  courseOutcomes: true,
+                  assessments: true,
+                  enrollments: true
+                }
+              }
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+          break;
+          
+        case 'DEPARTMENT':
+          // Department users can see courses from their department's programs
+          courses = await db.course.findMany({
+            where: {
+              batch: {
+                program: {
+                  departmentId: user.departmentId
+                }
+              }
+            },
+            include: {
+              batch: {
+                include: {
+                  program: {
+                    select: {
+                      name: true,
+                      code: true
+                    }
+                  }
+                }
+              },
+              _count: {
+                select: {
+                  courseOutcomes: true,
+                  assessments: true,
+                  enrollments: true
+                }
+              }
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+          break;
+          
+        case 'PROGRAM_COORDINATOR':
+          // Program coordinators can see courses from their programs
+          courses = await db.course.findMany({
+            where: {
+              batch: {
+                programId: user.programId
+              }
+            },
+            include: {
+              batch: {
+                include: {
+                  program: {
+                    select: {
+                      name: true,
+                      code: true
+                    }
+                  }
+                }
+              },
+              _count: {
+                select: {
+                  courseOutcomes: true,
+                  assessments: true,
+                  enrollments: true
+                }
+              }
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+          break;
+          
+        default:
+          return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+      }
+    }
 
     return NextResponse.json(courses);
   } catch (error) {
@@ -78,6 +249,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate that the user has access to the specified batch
     if (user.role === 'PROGRAM_COORDINATOR') {
       const batch = await db.batch.findUnique({
         where: { id: batchId },
@@ -88,7 +260,7 @@ export async function POST(request: NextRequest) {
 
       if (!batch || batch.programId !== user.programId) {
         return NextResponse.json(
-          { error: 'Program coordinators can only create courses for their assigned program batches' },
+          { error: 'You can only create courses for batches in your assigned program' },
           { status: 403 }
         );
       }
