@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getUserFromRequest } from '@/lib/server-auth';
+import { canCreateBatch } from '@/lib/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +47,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const user = await getUserFromRequest(request);
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Authorization required' },
+        { status: 401 }
+      );
+    }
+
+    // Check permissions
+    if (!canCreateBatch(user)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions. Only admin, university, and department roles can create batches.' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { name, programId, startYear, endYear } = body;
 

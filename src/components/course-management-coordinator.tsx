@@ -147,7 +147,7 @@ function CourseCategory({ title, courses, status, defaultExpanded = false, onUpd
                     <div>
                       <p className="text-sm font-medium text-gray-900">{course.name}</p>
                       <p className="text-xs text-gray-600">{course.code} • {course.semester} Semester</p>
-                      <p className="text-xs text-gray-500">{course.batch.program.name} • {course.batch.name}</p>
+                      <p className="text-xs text-gray-500">{course.batch?.program?.name || 'Unknown Program'} • {course.batch?.name || 'Unknown Batch'}</p>
                       {status === 'ACTIVE' && course._count.enrollments > 0 && (
                         <p className="text-xs text-green-600 font-medium">
                           {course._count.enrollments} students enrolled
@@ -279,16 +279,13 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
       setLoading(true);
       
       // Use relative URL to work in both development and production
-      const url = `/api/courses`;
+      const url = `/api/courses?batchId=${user.batchId}`;
       
       console.log('=== FETCHING COURSES ===');
-      console.log('User:', user);
       console.log('User batchId:', user.batchId);
       console.log('Fetching from URL:', url);
       
-      const response = await fetch(url, {
-        credentials: 'include',
-      });
+      const response = await fetch(url);
       
       console.log('Response status:', response.status);
       
@@ -298,31 +295,11 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
         setCourses(data);
       } else {
         console.error('Failed to fetch courses:', response.status);
-        // Try without credentials as fallback
-        try {
-          const fallbackResponse = await fetch(url);
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            console.log('Courses fetched (fallback):', data.length);
-            setCourses(data);
-          }
-        } catch (fallbackError) {
-          console.error('Fallback fetch also failed:', fallbackError);
-        }
+        toast.error('Failed to fetch courses');
       }
     } catch (error) {
       console.error('Error fetching courses:', error);
-      // Try without credentials as fallback
-      try {
-        const fallbackResponse = await fetch(`/api/courses`);
-        if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json();
-          console.log('Courses fetched (fallback):', data.length);
-          setCourses(data);
-        }
-      } catch (fallbackError) {
-        console.error('Fallback fetch also failed:', fallbackError);
-      }
+      toast.error('Error fetching courses');
     } finally {
       setLoading(false);
     }
@@ -352,60 +329,31 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
       const currentCourse = courses.find(c => c.id === courseId);
       const courseName = currentCourse?.name || 'Course';
       
-      console.log('=== FRONTEND COURSE STATUS UPDATE ===');
+      console.log('=== UPDATING COURSE STATUS ===');
       console.log('Course ID:', courseId);
       console.log('New Status:', newStatus);
-      console.log('Current User:', user);
-      console.log('User Role:', user.role);
-      console.log('User Email:', user.email);
-      console.log('Current Origin:', window.location.origin);
       
-      // Use relative URL to work in both development and production
-      const url = `/api/courses/${courseId}/status`;
-      console.log('Request URL:', url);
-      console.log('Request Method: POST with PATCH override');
-      console.log('Window Location:', window.location.href);
-      
-      // Add request debugging
-      const requestBody = JSON.stringify({ status: newStatus });
-      console.log('Request Body:', requestBody);
-      
-      const response = await fetch(url, {
+      const response = await fetch(`/api/courses/${courseId}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-HTTP-Method-Override': 'PATCH',
         },
-        credentials: 'include',
-        body: requestBody,
+        body: JSON.stringify({ status: newStatus }),
       });
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-      console.log('Response ok:', response.ok);
-
-      // Try to get response text first to see the exact error
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (parseError) {
-        console.log('Failed to parse response as JSON, using raw text');
-        responseData = { message: responseText };
-      }
 
       if (response.ok) {
-        const updatedCourse = responseData;
+        const responseData = await response.json();
+        console.log('Update successful:', responseData);
         
         // Show appropriate success message based on status change
         if (newStatus === 'ACTIVE') {
           if (responseData.message && responseData.message.includes('automatic enrollment completed')) {
             toast.success(`${courseName} is now active! Automatic enrollment has been processed.`);
           } else {
-            const enrolledCount = updatedCourse._count?.enrollments || 0;
+            const enrolledCount = responseData._count?.enrollments || 0;
             toast.success(`${courseName} is now active! ${enrolledCount > 0 ? `${enrolledCount} students enrolled.` : ''}`);
           }
         } else if (newStatus === 'COMPLETED') {
@@ -417,76 +365,47 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
         // Refresh the courses list to show the updated status
         setRefreshKey(prev => prev + 1);
       } else {
-        // Show more detailed error message
-        console.error('API Error Response:', responseData);
-        
-        // Handle specific preview environment error
-        if (response.status === 403 && responseData.Message && responseData.Message.includes('unauthorized method')) {
-          toast.error('API method not authorized. Trying alternative method...');
-          console.log('Preview environment error detected, but we are now using POST with method override');
-        } else {
-          toast.error(responseData.error || responseData.message || `Failed to update course status: ${response.statusText}`);
-        }
+        const errorData = await response.json();
+        console.error('Update failed:', errorData);
+        toast.error(errorData.message || `Failed to update course status`);
       }
     } catch (error) {
       console.error('Error updating course status:', error);
-      toast.error(`Network error: ${error instanceof Error ? error.message : 'Failed to update course status'}`);
+      toast.error('Error updating course status');
     } finally {
       setUpdatingCourseId(null);
     }
   };
-
   const handleDeleteCourse = async (courseId: string, courseName: string) => {
     try {
       setDeletingCourseId(courseId);
       
-      console.log('=== FRONTEND COURSE DELETION ===');
+      console.log('=== DELETING COURSE ===');
       console.log('Course ID:', courseId);
       console.log('Course Name:', courseName);
-      console.log('Current User:', user);
-      console.log('User Role:', user.role);
-      console.log('User Email:', user.email);
       
-      const url = `/api/courses/${courseId}`;
-      console.log('Request URL:', url);
-      console.log('Request Method: DELETE');
-      
-      const response = await fetch(url, {
+      const response = await fetch(`/api/courses/${courseId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       console.log('Response status:', response.status);
 
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-        console.log('Parsed response data:', responseData);
-      } catch (parseError) {
-        console.log('Failed to parse response as JSON, using raw text');
-        responseData = { message: responseText };
-      }
-
       if (response.ok) {
-        toast.success(`${courseName} has been deleted successfully!`);
-        
-        // Refresh the courses list to remove the deleted course
+        toast.success(`${courseName} deleted successfully!`);
+        // Refresh the courses list
         setRefreshKey(prev => prev + 1);
       } else {
-        console.error('API Error Response:', responseData);
-        toast.error(responseData.error || responseData.message || `Failed to delete course: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Delete failed:', errorData);
+        toast.error(errorData.message || `Failed to delete course`);
       }
     } catch (error) {
       console.error('Error deleting course:', error);
-      toast.error(`Network error: ${error instanceof Error ? error.message : 'Failed to delete course'}`);
+      toast.error('Error deleting course');
     } finally {
       setDeletingCourseId(null);
     }
   };
-
   const handleEditCourse = (course: Course) => {
     setEditingCourse(course);
     setIsEditModalOpen(true);

@@ -1,12 +1,12 @@
 'use client';
 
 import { AppWrapper } from '@/components/app-wrapper';
-import { BatchCourseManagement } from '@/components/batch-course-management';
+import { Dashboard } from '@/components/dashboard';
 
 export default function Home() {
   return (
     <AppWrapper>
-      <BatchCourseManagement />
+      <Dashboard />
     </AppWrapper>
   );
 }

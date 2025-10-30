@@ -1,6 +1,28 @@
 import { create } from 'zustand';
 import { Course } from '@/types/course';
 
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  if (typeof window === 'undefined') return {};
+  
+  const storedUser = localStorage.getItem('obe-user');
+  if (!storedUser) return {};
+
+  try {
+    const user = JSON.parse(storedUser);
+    const token = btoa(JSON.stringify(user));
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  } catch (error) {
+    console.error('Failed to parse stored user:', error);
+    return {
+      'Content-Type': 'application/json',
+    };
+  }
+};
+
 interface CourseStore {
   courses: Course[];
   selectedCourse: Course | null;
@@ -53,9 +75,7 @@ export const useCourseStore = create<CourseStore>((set, get) => ({
     try {
       const response = await fetch('/api/courses', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(courseData),
       });
 

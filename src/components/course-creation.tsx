@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, BookOpen } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface User {
   id: string;
@@ -33,20 +33,12 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
     e.preventDefault();
     
     if (!courseCode.trim() || !courseName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
+      toast.error("Please fill in all fields");
       return;
     }
 
     if (!user.programId || !user.batchId) {
-      toast({
-        title: "Error",
-        description: "Please select a program and batch before creating a course",
-        variant: "destructive",
-      });
+      toast.error("Please select a program and batch before creating a course");
       return;
     }
 
@@ -62,35 +54,23 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
         body: JSON.stringify({
           code: courseCode.toUpperCase(),
           name: courseName.trim(),
-          programId: user.programId,
           batchId: user.batchId,
           semester: "1st",
         }),
       });
 
       if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Course created successfully",
-        });
+        toast.success("Course created successfully");
         setCourseCode('');
         setCourseName('');
         onCourseCreated?.();
       } else {
         const error = await response.json();
-        toast({
-          title: "Error",
-          description: error.message || "Failed to create course",
-          variant: "destructive",
-        });
+        toast.error(error.message || "Failed to create course");
       }
     } catch (error) {
       console.error('Error creating course:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create course",
-        variant: "destructive",
-      });
+      toast.error("Failed to create course");
     } finally {
       setIsSubmitting(false);
     }

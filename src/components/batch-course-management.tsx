@@ -9,9 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { CourseCreationDialog } from '@/components/course/course-creation-dialog';
+import { CourseStatusDropdown } from '@/components/course/course-status-dropdown';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { canCreateBatch, canCreateCourse } from '@/lib/permissions';
 import { 
   BookOpen, 
   Users, 
@@ -67,22 +71,13 @@ interface Course {
 }
 
 export function BatchCourseManagement() {
+  const { user } = useAuth();
   const [batches, setBatches] = useState<Batch[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateCourseOpen, setIsCreateCourseOpen] = useState(false);
   const [isCreateBatchOpen, setIsCreateBatchOpen] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
-
-  // Form states
-  const [newCourse, setNewCourse] = useState({
-    code: '',
-    name: '',
-    semester: '',
-    description: '',
-    status: 'FUTURE' as const
-  });
 
   const [newBatch, setNewBatch] = useState({
     name: '',
@@ -90,6 +85,16 @@ export function BatchCourseManagement() {
     startYear: new Date().getFullYear(),
     endYear: new Date().getFullYear() + 4
   });
+
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    if (!user) return {};
+    const token = btoa(JSON.stringify(user));
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
 
   // Fetch batches
   const fetchBatches = async () => {
@@ -163,7 +168,7 @@ export function BatchCourseManagement() {
     try {
       const response = await fetch('/api/batches', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newBatch)
       });
 
@@ -184,7 +189,7 @@ export function BatchCourseManagement() {
         const error = await response.json();
         toast({
           title: 'Error',
-          description: error.message || 'Failed to create batch',
+          description: error.error || 'Failed to create batch',
           variant: 'destructive'
         });
       }
@@ -193,85 +198,6 @@ export function BatchCourseManagement() {
       toast({
         title: 'Error',
         description: 'Failed to create batch',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Create new course
-  const handleCreateCourse = async () => {
-    if (!selectedBatch) return;
-
-    try {
-      const response = await fetch('/api/courses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newCourse,
-          batchId: selectedBatch.id
-        })
-      });
-
-      if (response.ok) {
-        await fetchCourses(selectedBatch.id);
-        setIsCreateCourseOpen(false);
-        setNewCourse({
-          code: '',
-          name: '',
-          semester: '',
-          description: '',
-          status: 'FUTURE'
-        });
-        toast({
-          title: 'Success',
-          description: 'Course created successfully'
-        });
-      } else {
-        const error = await response.json();
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to create course',
-          variant: 'destructive'
-        });
-      }
-    } catch (error) {
-      console.error('Failed to create course:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create course',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  // Update course status
-  const updateCourseStatus = async (courseId: string, status: string) => {
-    try {
-      const response = await fetch(`/api/courses/${courseId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-
-      if (response.ok) {
-        await fetchCourses(selectedBatch!.id);
-        toast({
-          title: 'Success',
-          description: 'Course status updated successfully'
-        });
-      } else {
-        const error = await response.json();
-        toast({
-          title: 'Error',
-          description: error.message || 'Failed to update course status',
-          variant: 'destructive'
-        });
-      }
-    } catch (error) {
-      console.error('Failed to update course status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update course status',
         variant: 'destructive'
       });
     }
@@ -344,76 +270,78 @@ export function BatchCourseManagement() {
           <h1 className="text-3xl font-bold">Batch & Course Management</h1>
           <p className="text-muted-foreground">Manage batches and their unique courses</p>
         </div>
-        <Dialog open={isCreateBatchOpen} onOpenChange={setIsCreateBatchOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Batch
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Batch</DialogTitle>
-              <DialogDescription>
-                Create a new batch for a specific program
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="batch-name">Batch Name</Label>
-                <Input
-                  id="batch-name"
-                  value={newBatch.name}
-                  onChange={(e) => setNewBatch({ ...newBatch, name: e.target.value })}
-                  placeholder="e.g., 2021-2025"
-                />
-              </div>
-              <div>
-                <Label htmlFor="program">Program</Label>
-                <Select value={newBatch.programId} onValueChange={(value) => setNewBatch({ ...newBatch, programId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a program" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {programs.map((program) => (
-                      <SelectItem key={program.id} value={program.id}>
-                        {program.name} ({program.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="start-year">Start Year</Label>
-                  <Input
-                    id="start-year"
-                    type="number"
-                    value={newBatch.startYear}
-                    onChange={(e) => setNewBatch({ ...newBatch, startYear: parseInt(e.target.value) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="end-year">End Year</Label>
-                  <Input
-                    id="end-year"
-                    type="number"
-                    value={newBatch.endYear}
-                    onChange={(e) => setNewBatch({ ...newBatch, endYear: parseInt(e.target.value) })}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateBatchOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateBatch} disabled={!newBatch.name || !newBatch.programId}>
+        {canCreateBatch(user) && (
+          <Dialog open={isCreateBatchOpen} onOpenChange={setIsCreateBatchOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
                 Create Batch
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Batch</DialogTitle>
+                <DialogDescription>
+                  Create a new batch for a specific program
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="batch-name">Batch Name</Label>
+                  <Input
+                    id="batch-name"
+                    value={newBatch.name}
+                    onChange={(e) => setNewBatch({ ...newBatch, name: e.target.value })}
+                    placeholder="e.g., 2021-2025"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="program">Program</Label>
+                  <Select value={newBatch.programId} onValueChange={(value) => setNewBatch({ ...newBatch, programId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a program" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {programs.map((program) => (
+                        <SelectItem key={program.id} value={program.id}>
+                          {program.name} ({program.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start-year">Start Year</Label>
+                    <Input
+                      id="start-year"
+                      type="number"
+                      value={newBatch.startYear}
+                      onChange={(e) => setNewBatch({ ...newBatch, startYear: parseInt(e.target.value) })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="end-year">End Year</Label>
+                    <Input
+                      id="end-year"
+                      type="number"
+                      value={newBatch.endYear}
+                      onChange={(e) => setNewBatch({ ...newBatch, endYear: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateBatchOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateBatch} disabled={!newBatch.name || !newBatch.programId}>
+                  Create Batch
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -510,82 +438,11 @@ export function BatchCourseManagement() {
                   {selectedBatch ? `Courses for ${selectedBatch.name}` : 'Select a batch to view courses'}
                 </CardDescription>
               </div>
-              {selectedBatch && (
-                <Dialog open={isCreateCourseOpen} onOpenChange={setIsCreateCourseOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Course
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Course to {selectedBatch.name}</DialogTitle>
-                      <DialogDescription>
-                        Create a new course for this batch
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="course-code">Course Code</Label>
-                        <Input
-                          id="course-code"
-                          value={newCourse.code}
-                          onChange={(e) => setNewCourse({ ...newCourse, code: e.target.value })}
-                          placeholder="e.g., CS101"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="course-name">Course Name</Label>
-                        <Input
-                          id="course-name"
-                          value={newCourse.name}
-                          onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
-                          placeholder="e.g., Introduction to Programming"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="semester">Semester</Label>
-                        <Input
-                          id="semester"
-                          value={newCourse.semester}
-                          onChange={(e) => setNewCourse({ ...newCourse, semester: e.target.value })}
-                          placeholder="e.g., 1st Semester"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="description">Description</Label>
-                        <Input
-                          id="description"
-                          value={newCourse.description}
-                          onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                          placeholder="Course description (optional)"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="status">Status</Label>
-                        <Select value={newCourse.status} onValueChange={(value: any) => setNewCourse({ ...newCourse, status: value })}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FUTURE">Future</SelectItem>
-                            <SelectItem value="ACTIVE">Active</SelectItem>
-                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsCreateCourseOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleCreateCourse} disabled={!newCourse.code || !newCourse.name}>
-                        Add Course
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+              {selectedBatch && canCreateCourse(user) && (
+                <CourseCreationDialog 
+                  batch={selectedBatch}
+                  onSuccess={() => fetchCourses(selectedBatch.id)}
+                />
               )}
             </div>
           </CardHeader>
@@ -610,7 +467,6 @@ export function BatchCourseManagement() {
                   <TabsContent value="all" className="mt-4">
                     <CourseTable 
                       courses={courses} 
-                      onStatusChange={updateCourseStatus}
                       onDelete={deleteCourse}
                     />
                   </TabsContent>
@@ -618,7 +474,6 @@ export function BatchCourseManagement() {
                   <TabsContent value="future" className="mt-4">
                     <CourseTable 
                       courses={courses.filter(c => c.status === 'FUTURE')} 
-                      onStatusChange={updateCourseStatus}
                       onDelete={deleteCourse}
                     />
                   </TabsContent>
@@ -626,7 +481,6 @@ export function BatchCourseManagement() {
                   <TabsContent value="active" className="mt-4">
                     <CourseTable 
                       courses={courses.filter(c => c.status === 'ACTIVE')} 
-                      onStatusChange={updateCourseStatus}
                       onDelete={deleteCourse}
                     />
                   </TabsContent>
@@ -634,7 +488,6 @@ export function BatchCourseManagement() {
                   <TabsContent value="completed" className="mt-4">
                     <CourseTable 
                       courses={courses.filter(c => c.status === 'COMPLETED')} 
-                      onStatusChange={updateCourseStatus}
                       onDelete={deleteCourse}
                     />
                   </TabsContent>
@@ -655,11 +508,9 @@ export function BatchCourseManagement() {
 
 function CourseTable({ 
   courses, 
-  onStatusChange, 
   onDelete 
 }: { 
   courses: Course[];
-  onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
 }) {
   const getStatusColor = (status: string) => {
@@ -712,43 +563,25 @@ function CourseTable({
                 </div>
               </TableCell>
               <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => onStatusChange(course.id, 'FUTURE')}
-                      disabled={course.status === 'FUTURE'}
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Mark as Future
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onStatusChange(course.id, 'ACTIVE')}
-                      disabled={course.status === 'ACTIVE'}
-                    >
-                      <Target className="h-4 w-4 mr-2" />
-                      Mark as Active
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onStatusChange(course.id, 'COMPLETED')}
-                      disabled={course.status === 'COMPLETED'}
-                    >
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                      Mark as Completed
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => onDelete(course.id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  <CourseStatusDropdown course={course} />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => onDelete(course.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </TableCell>
             </TableRow>
           ))}

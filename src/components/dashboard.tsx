@@ -21,7 +21,8 @@ interface User {
 
 type ActiveView = 'dashboard' | 'users' | 'academic' | 'courses';
 
-export function Dashboard({ user }: { user: User }) {
+export function Dashboard() {
+  const { user } = useAuth();
   const { getContextString } = useSidebarContext();
   const [activeView, setActiveView] = React.useState<ActiveView>('dashboard');
 
@@ -61,6 +62,14 @@ export function Dashboard({ user }: { user: User }) {
 
   // For now, we'll render the overview by default
   // In a real app, this would be handled by routing through the existing sidebar
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <DashboardOverview />
