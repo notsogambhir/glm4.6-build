@@ -4,6 +4,9 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster-simple";
 import { AuthProvider } from '@/hooks/use-auth';
 import { SidebarProvider } from '@/contexts/sidebar-context';
+import { Suspense } from 'react';
+import { PageLoading } from '@/components/ui/page-loading';
+import { NavigationLoading } from '@/components/ui/navigation-loading';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,12 +52,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <AuthProvider>
-          <SidebarProvider>
-            {children}
-            <Toaster />
-          </SidebarProvider>
-        </AuthProvider>
+        <Suspense fallback={<PageLoading message="Initializing application..." />}>
+          <AuthProvider>
+            <SidebarProvider>
+              <NavigationLoading />
+              {children}
+              <Toaster />
+            </SidebarProvider>
+          </AuthProvider>
+        </Suspense>
       </body>
     </html>
   );

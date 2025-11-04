@@ -5,12 +5,13 @@ import { LoginForm } from '@/components/login-form';
 import { ProgramSelection } from '@/components/program-selection';
 import { BatchSelectionModal } from '@/components/batch-selection-modal';
 import { GlobalLayout } from '@/components/global-layout';
+import { memo } from 'react';
 
 interface AppWrapperProps {
   children: React.ReactNode;
 }
 
-export function AppWrapper({ children }: AppWrapperProps) {
+const AppWrapper = memo(function AppWrapper({ children }: AppWrapperProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -38,4 +39,6 @@ export function AppWrapper({ children }: AppWrapperProps) {
       <BatchSelectionModal user={user} />
     </GlobalLayout>
   );
-}
+});
+
+export { AppWrapper };

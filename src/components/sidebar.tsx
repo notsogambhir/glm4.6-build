@@ -297,12 +297,14 @@ export function Sidebar({ user, activeView, onViewChange, onLogout, onBackToSele
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.id} onClick={() => onViewChange(item.id)}>
-                <NavLink href={item.href}>
-                  <Icon className="h-4 w-4 mr-3" />
-                  {item.label}
-                </NavLink>
-              </div>
+              <NavLink 
+                key={item.id} 
+                href={item.href}
+                prefetch={true}
+              >
+                <Icon className="h-4 w-4 mr-3" />
+                {item.label}
+              </NavLink>
             );
           })}
         </nav>

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar';
 import { useAuth } from '@/hooks/use-auth';
 import { useSidebarContext } from '@/contexts/sidebar-context';
+import { memo } from 'react';
 
 interface User {
   id: string;
@@ -22,31 +23,49 @@ interface GlobalLayoutProps {
   children: React.ReactNode;
 }
 
-export function GlobalLayout({ user, children }: GlobalLayoutProps) {
+const GlobalLayout = memo(function GlobalLayout({ user, children }: GlobalLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { logout, updateUserSelections } = useAuth();
   const { selectedProgram, selectedBatch, programs, batches } = useSidebarContext();
   const [activeView, setActiveView] = useState('dashboard');
 
+  // Memoize path to view mapping to avoid recreating on every render
+  const pathToViewMap = useMemo(() => ({
+    '/': 'dashboard',
+    '/admin': 'admin',
+    '/users': 'users',
+    '/academic': 'academic',
+    '/courses': 'courses',
+    '/students': 'students',
+    '/teachers': 'teachers',
+    '/faculty-management': 'faculty-management',
+    '/student-management': 'student-management',
+    '/program-outcomes': 'program-outcomes',
+    '/reports': 'reports',
+    '/obe-compliance': 'obe-compliance',
+    '/system-settings': 'system-settings',
+  }), []);
+
+  // Memoize view to path mapping
+  const viewToPathMap = useMemo(() => ({
+    'dashboard': '/',
+    'admin': '/admin',
+    'users': '/users',
+    'academic': '/academic',
+    'courses': '/courses',
+    'students': '/students',
+    'teachers': '/teachers',
+    'faculty-management': '/faculty-management',
+    'student-management': '/student-management',
+    'program-outcomes': '/program-outcomes',
+    'reports': '/reports',
+    'obe-compliance': '/obe-compliance',
+    'system-settings': '/system-settings',
+  }), []);
+
   // Update active view based on current path
   useEffect(() => {
-    const pathToViewMap: Record<string, string> = {
-      '/': 'dashboard',
-      '/admin': 'admin',
-      '/users': 'users',
-      '/academic': 'academic',
-      '/courses': 'courses',
-      '/students': 'students',
-      '/teachers': 'teachers',
-      '/faculty-management': 'faculty-management',
-      '/student-management': 'student-management',
-      '/program-outcomes': 'program-outcomes',
-      '/reports': 'reports',
-      '/obe-compliance': 'obe-compliance',
-      '/system-settings': 'system-settings',
-    };
-
     // Find matching view
     const matchedView = Object.entries(pathToViewMap).find(([path]) => 
       pathname === path || pathname.startsWith(path + '/')
@@ -55,23 +74,23 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
     if (matchedView) {
       setActiveView(matchedView[1]);
     }
-  }, [pathname]);
+  }, [pathname, pathToViewMap]);
 
-  // Get display names for program and batch
-  const getProgramName = () => {
+  // Memoize display name functions
+  const getProgramName = useCallback(() => {
     if (!selectedProgram) return '';
     const program = programs.find(p => p.id === selectedProgram);
     return program ? program.name : '';
-  };
+  }, [selectedProgram, programs]);
 
-  const getBatchName = () => {
+  const getBatchName = useCallback(() => {
     if (!selectedBatch) return '';
     const batch = batches.find(b => b.id === selectedBatch);
     return batch ? batch.name : '';
-  };
+  }, [selectedBatch, batches]);
 
-  // Build display string
-  const getDisplayString = () => {
+  // Memoize display string
+  const getDisplayString = useCallback(() => {
     const parts: string[] = [];
     const programName = getProgramName();
     const batchName = getBatchName();
@@ -80,45 +99,28 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
     if (batchName) parts.push(batchName);
     
     return parts.join(' - ');
-  };
+  }, [getProgramName, getBatchName]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await logout();
     router.push('/');
-  };
+  }, [logout, router]);
 
-  const handleBackToSelection = () => {
+  const handleBackToSelection = useCallback(() => {
     // Clear program and batch selections
     if (user) {
       updateUserSelections({ programId: undefined, batchId: undefined });
     }
-  };
+  }, [user, updateUserSelections]);
 
-  const handleViewChange = (view: string) => {
+  const handleViewChange = useCallback((view: string) => {
     setActiveView(view);
-
-    // Navigate to the corresponding route
-    const viewToPathMap: Record<string, string> = {
-      'dashboard': '/',
-      'admin': '/admin',
-      'users': '/users',
-      'academic': '/academic',
-      'courses': '/courses',
-      'students': '/students',
-      'teachers': '/teachers',
-      'faculty-management': '/faculty-management',
-      'student-management': '/student-management',
-      'program-outcomes': '/program-outcomes',
-      'reports': '/reports',
-      'obe-compliance': '/obe-compliance',
-      'system-settings': '/system-settings',
-    };
 
     const targetPath = viewToPathMap[view];
     if (targetPath) {
       router.push(targetPath);
     }
-  };
+  }, [viewToPathMap, router]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -161,4 +163,6 @@ export function GlobalLayout({ user, children }: GlobalLayoutProps) {
       </div>
     </div>
   );
-}
+});
+
+export { GlobalLayout };
