@@ -38,11 +38,13 @@ import Link from 'next/link';
 interface Assessment {
   id: string;
   name: string;
-  type: 'Internal' | 'External';
-  totalMarks: number;
-  questions: number;
-  marksUploaded: boolean;
+  type: 'exam' | 'quiz' | 'assignment' | 'project';
+  maxMarks: number;
+  weightage: number;
+  semester: string;
+  isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface AssessmentsTabProps {
@@ -55,8 +57,10 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAssessment, setNewAssessment] = useState({
     name: '',
-    type: 'Internal' as 'Internal' | 'External',
-    totalMarks: 100,
+    type: 'exam' as 'exam' | 'quiz' | 'assignment' | 'project',
+    maxMarks: 100,
+    weightage: 10,
+    semester: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -70,10 +74,10 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
 
   const fetchAssessments = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}`);
+      const response = await fetch(`/api/courses/${courseId}/assessments`);
       if (response.ok) {
-        const courseData = await response.json();
-        setAssessments(courseData.assessments || []);
+        const assessmentsData = await response.json();
+        setAssessments(assessmentsData || []);
       }
     } catch (error) {
       console.error('Failed to fetch assessments:', error);
@@ -81,10 +85,10 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
   };
 
   const handleCreateAssessment = async () => {
-    if (!newAssessment.name.trim()) {
+    if (!newAssessment.name.trim() || !newAssessment.semester.trim()) {
       toast({
         title: "Error",
-        description: "Please enter assessment name",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
@@ -92,26 +96,43 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
 
     setLoading(true);
     try {
-      const assessmentData: Assessment = {
-        id: Date.now().toString(),
-        name: newAssessment.name.trim(),
-        type: newAssessment.type,
-        totalMarks: newAssessment.totalMarks,
-        questions: 0,
-        marksUploaded: false,
-        createdAt: new Date().toISOString().split('T')[0],
-      };
-
-      // [MOCK API] Add to API
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-      
-      setAssessments(prev => [...prev, assessmentData]);
-      setNewAssessment({ name: '', type: 'Internal', totalMarks: 100 });
-      setIsCreateDialogOpen(false);
-      toast({
-        title: "Success",
-        description: "Assessment created successfully",
+      const response = await fetch(`/api/courses/${courseId}/assessments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newAssessment.name.trim(),
+          type: newAssessment.type,
+          maxMarks: newAssessment.maxMarks,
+          weightage: newAssessment.weightage,
+          semester: newAssessment.semester.trim(),
+        }),
       });
+
+      if (response.ok) {
+        const createdAssessment = await response.json();
+        setAssessments(prev => [...prev, createdAssessment]);
+        setNewAssessment({ 
+          name: '', 
+          type: 'exam', 
+          maxMarks: 100, 
+          weightage: 10, 
+          semester: courseData?.semester || '' 
+        });
+        setIsCreateDialogOpen(false);
+        toast({
+          title: "Success",
+          description: "Assessment created successfully",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to create assessment",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -124,7 +145,23 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
   };
 
   const getTypeColor = (type: string) => {
-    return type === 'Internal' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+    switch (type) {
+      case 'exam': return 'bg-red-100 text-red-800';
+      case 'quiz': return 'bg-blue-100 text-blue-800';
+      case 'assignment': return 'bg-green-100 text-green-800';
+      case 'project': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'exam': return 'Exam';
+      case 'quiz': return 'Quiz';
+      case 'assignment': return 'Assignment';
+      case 'project': return 'Project';
+      default: return type;
+    }
   };
 
   return (
@@ -164,7 +201,7 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
                     <Label htmlFor="assessment-type">Type</Label>
                     <Select
                       value={newAssessment.type}
-                      onValueChange={(value: 'Internal' | 'External') => 
+                      onValueChange={(value: 'exam' | 'quiz' | 'assignment' | 'project') => 
                         setNewAssessment(prev => ({ ...prev, type: value }))
                       }
                     >
@@ -172,8 +209,10 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Internal">Internal</SelectItem>
-                        <SelectItem value="External">External</SelectItem>
+                        <SelectItem value="exam">Exam</SelectItem>
+                        <SelectItem value="quiz">Quiz</SelectItem>
+                        <SelectItem value="assignment">Assignment</SelectItem>
+                        <SelectItem value="project">Project</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -184,11 +223,35 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
                       type="number"
                       min="1"
                       max="1000"
-                      value={newAssessment.totalMarks}
+                      value={newAssessment.maxMarks}
                       onChange={(e) => setNewAssessment(prev => ({ 
                         ...prev, 
-                        totalMarks: parseInt(e.target.value) || 100 
+                        maxMarks: parseInt(e.target.value) || 100 
                       }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="weightage">Weightage (%)</Label>
+                    <Input
+                      id="weightage"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={newAssessment.weightage}
+                      onChange={(e) => setNewAssessment(prev => ({ 
+                        ...prev, 
+                        weightage: parseFloat(e.target.value) || 10 
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="semester">Semester</Label>
+                    <Input
+                      id="semester"
+                      placeholder="e.g., 1st Semester"
+                      value={newAssessment.semester}
+                      onChange={(e) => setNewAssessment(prev => ({ ...prev, semester: e.target.value }))}
                     />
                   </div>
                   <div className="flex gap-2 justify-end">
@@ -225,8 +288,8 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
                     <TableHead>Assessment Name</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Total Marks</TableHead>
-                    <TableHead>Questions</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Weightage</TableHead>
+                    <TableHead>Semester</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -238,40 +301,22 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
                       </TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(assessment.type)}>
-                          {assessment.type}
+                          {getTypeLabel(assessment.type)}
                         </Badge>
                       </TableCell>
-                      <TableCell>{assessment.totalMarks}</TableCell>
-                      <TableCell>{assessment.questions}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {assessment.marksUploaded ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm text-green-600">Uploaded</span>
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="h-4 w-4 text-orange-600" />
-                              <span className="text-sm text-orange-600">Pending</span>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+                      <TableCell>{assessment.maxMarks}</TableCell>
+                      <TableCell>{assessment.weightage}%</TableCell>
+                      <TableCell>{assessment.semester}</TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Link href={`/courses/${courseId}/assessments/${assessment.id}`}>
-                            <Button size="sm" variant="outline">
-                              <Edit className="h-3 w-3 mr-1" />
-                              Manage
-                            </Button>
-                          </Link>
-                          {!assessment.marksUploaded && (
-                            <Button size="sm" variant="outline">
-                              <Upload className="h-3 w-3 mr-1" />
-                              Upload
-                            </Button>
-                          )}
+                          <Button size="sm" variant="outline">
+                            <Edit className="h-3 w-3 mr-1" />
+                            Manage
+                          </Button>
+                          <Button size="sm" variant="outline">
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -296,33 +341,33 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
 
         <Card className="p-3">
           <CardHeader className="pb-2 px-0 pt-0">
-            <CardTitle className="text-xs font-medium">Internal</CardTitle>
+            <CardTitle className="text-xs font-medium">Exams</CardTitle>
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <div className="text-xl font-bold">
-              {assessments.filter(a => a.type === 'Internal').length}
+              {assessments.filter(a => a.type === 'exam').length}
             </div>
           </CardContent>
         </Card>
 
         <Card className="p-3">
           <CardHeader className="pb-2 px-0 pt-0">
-            <CardTitle className="text-xs font-medium">External</CardTitle>
+            <CardTitle className="text-xs font-medium">Assignments</CardTitle>
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <div className="text-xl font-bold">
-              {assessments.filter(a => a.type === 'External').length}
+              {assessments.filter(a => a.type === 'assignment').length}
             </div>
           </CardContent>
         </Card>
 
         <Card className="p-3">
           <CardHeader className="pb-2 px-0 pt-0">
-            <CardTitle className="text-xs font-medium">Upload Status</CardTitle>
+            <CardTitle className="text-xs font-medium">Total Weightage</CardTitle>
           </CardHeader>
           <CardContent className="px-0 pb-0">
             <div className="text-xl font-bold">
-              {assessments.filter(a => a.marksUploaded).length}/{assessments.length}
+              {assessments.reduce((sum, a) => sum + a.weightage, 0).toFixed(1)}%
             </div>
           </CardContent>
         </Card>

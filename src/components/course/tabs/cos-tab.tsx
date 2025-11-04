@@ -64,10 +64,10 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
 
   const fetchCOs = async () => {
     try {
-      const response = await fetch(`/api/courses/${courseId}`);
+      const response = await fetch(`/api/courses/${courseId}/cos`);
       if (response.ok) {
-        const courseData = await response.json();
-        setCOs(courseData.courseOutcomes || []);
+        const cosData = await response.json();
+        setCOs(cosData || []);
       }
     } catch (error) {
       console.error('Failed to fetch COs:', error);
@@ -91,22 +91,33 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
 
     setLoading(true);
     try {
-      const newCOData: CO = {
-        id: Date.now().toString(),
-        code: getNextCOCode(),
-        description: newCO.description.trim(),
-      };
-
-      // [MOCK API] Add to API
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-      
-      setCOs(prev => [...prev, newCOData]);
-      setNewCO({ description: '' });
-      setIsAddDialogOpen(false);
-      toast({
-        title: "Success",
-        description: `CO ${newCOData.code} added successfully`,
+      const response = await fetch(`/api/courses/${courseId}/cos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: newCO.description.trim(),
+        }),
       });
+
+      if (response.ok) {
+        const createdCO = await response.json();
+        setCOs(prev => [...prev, createdCO]);
+        setNewCO({ description: '' });
+        setIsAddDialogOpen(false);
+        toast({
+          title: "Success",
+          description: `CO ${createdCO.code} added successfully`,
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to add CO",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -118,25 +129,66 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
     }
   };
 
-  const handleEditCO = (coId: string, description: string) => {
-    setCOs(prev => prev.map(co => 
-      co.id === coId ? { ...co, description, isEditing: false } : co
-    ));
-    setEditingCO(null);
+  const handleEditCO = async (coId: string, description: string) => {
+    try {
+      const response = await fetch(`/api/courses/${courseId}/cos/${coId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          description: description.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setCOs(prev => prev.map(co => 
+          co.id === coId ? { ...co, description, isEditing: false } : co
+        ));
+        setEditingCO(null);
+        toast({
+          title: "Success",
+          description: "CO updated successfully",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to update CO",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update CO",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteCO = async (coId: string) => {
     if (!confirm('Are you sure you want to delete this CO?')) return;
 
     try {
-      // [MOCK API] Delete from API
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-      
-      setCOs(prev => prev.filter(co => co.id !== coId));
-      toast({
-        title: "Success",
-        description: "CO deleted successfully",
+      const response = await fetch(`/api/courses/${courseId}/cos/${coId}`, {
+        method: 'DELETE',
       });
+
+      if (response.ok) {
+        setCOs(prev => prev.filter(co => co.id !== coId));
+        toast({
+          title: "Success",
+          description: "CO deleted successfully",
+        });
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Error",
+          description: errorData.error || "Failed to delete CO",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
