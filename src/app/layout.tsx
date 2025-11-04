@@ -6,7 +6,6 @@ import { AuthProvider } from '@/hooks/use-auth';
 import { SidebarProvider } from '@/contexts/sidebar-context';
 import { Suspense } from 'react';
 import { PageLoading } from '@/components/ui/page-loading';
-import { NavigationLoading } from '@/components/ui/navigation-loading';
 import { ErrorSuppressor } from '@/components/error-suppressor';
 
 const geistSans = Geist({
@@ -57,7 +56,6 @@ export default function RootLayout({
           <ErrorSuppressor />
           <AuthProvider>
             <SidebarProvider>
-              <NavigationLoading />
               {children}
               <Toaster />
             </SidebarProvider>

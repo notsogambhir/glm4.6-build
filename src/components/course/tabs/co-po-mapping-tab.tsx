@@ -1,4 +1,4 @@
-'use client';
+' use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { BarChart3, Target, Save } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { courseEvents } from '@/lib/course-events';
 
 interface CO {
   id: string;
@@ -36,91 +37,107 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
   const [pos, setPOs] = useState<PO[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [loading, setLoading] = useState(false);
+  const [programId, setProgramId] = useState<string>('');
+  const [isDebugMode, setIsDebugMode] = useState(true);
 
   useEffect(() => {
-    if (courseData?.courseOutcomes) {
-      setCOs(courseData.courseOutcomes);
-      fetchPOsAndMappings();
-    } else {
+    fetchData();
+    
+    // Listen for CO updates
+    const handleCOUpdate = () => {
       fetchData();
-    }
-  }, [courseId, courseData]);
-
-  const fetchPOsAndMappings = async () => {
-    try {
-      if (!courseData?.batch?.programId) {
-        console.warn('No program ID found in course data');
-        return;
-      }
-
-      // Fetch POs for the course's program
-      const posResponse = await fetch(`/api/pos?programId=${courseData.batch.programId}`);
-      if (posResponse.ok) {
-        const posData = await posResponse.json();
-        setPOs(posData);
-      }
-
-      // Fetch existing CO-PO mappings for this course
-      const mappingsResponse = await fetch(`/api/co-po-mappings?courseId=${courseId}`);
-      if (mappingsResponse.ok) {
-        const mappingsData = await mappingsResponse.json();
-        // Convert mappings data to the expected format
-        const formattedMappings = mappingsData.map((mapping: any) => ({
-          coId: mapping.coId,
-          poId: mapping.poId,
-          level: mapping.level
-        }));
-        setMappings(formattedMappings);
-      }
-    } catch (error) {
-      console.error('Failed to fetch POs and mappings:', error);
-    }
-  };
+    };
+    
+    courseEvents.on('co-updated', handleCOUpdate);
+    
+    return () => {
+      courseEvents.off('co-updated', handleCOUpdate);
+    };
+  }, [courseId]);
 
   const fetchData = async () => {
     try {
-      // [MOCK DATA] Mock COs data
-      const mockCOs: CO[] = [
-        { id: '1', code: 'CO1', description: 'Understand fundamental programming concepts' },
-        { id: '2', code: 'CO2', description: 'Design and implement algorithms' },
-        { id: '3', code: 'CO3', description: 'Apply programming skills to solve problems' },
-        { id: '4', code: 'CO4', description: 'Analyze and debug code effectively' },
-        { id: '5', code: 'CO5', description: 'Work collaboratively on projects' },
-      ];
+      console.log('=== CO-PO MAPPING: Starting data fetch ===');
+      console.log('Course ID:', courseId);
+      console.log('Course Data:', courseData);
+      
+      // Fetch COs for this course
+      const cosResponse = await fetch(`/api/courses/${courseId}/cos`);
+      let cosData: CO[] = [];
+      if (cosResponse.ok) {
+        cosData = await cosResponse.json();
+        console.log('COs fetched:', cosData);
+      } else {
+        console.error('Failed to fetch COs:', cosResponse.status);
+      }
+      setCOs(cosData || []);
 
-      // [MOCK DATA] Mock POs data
-      const mockPOs: PO[] = [
-        { id: '1', code: 'PO1', description: 'Engineering Knowledge' },
-        { id: '2', code: 'PO2', description: 'Problem Analysis' },
-        { id: '3', code: 'PO3', description: 'Design and Development' },
-        { id: '4', code: 'PO4', description: 'Conduct Investigations' },
-        { id: '5', code: 'PO5', description: 'Modern Tool Usage' },
-        { id: '6', code: 'PO6', description: 'Engineer and Society' },
-        { id: '7', code: 'PO7', description: 'Environment and Sustainability' },
-        { id: '8', code: 'PO8', description: 'Ethics' },
-        { id: '9', code: 'PO9', description: 'Individual and Team Work' },
-        { id: '10', code: 'PO10', description: 'Communication' },
-        { id: '11', code: 'PO11', description: 'Project Management' },
-        { id: '12', code: 'PO12', description: 'Life-long Learning' },
-      ];
+      // Get program ID from course data or fetch course details
+      let programId = courseData?.batch?.programId;
+      console.log('Initial program ID from courseData:', programId);
+      
+      if (!programId) {
+        // Fetch course details to get program ID
+        console.log('Fetching course details to get program ID...');
+        const courseResponse = await fetch(`/api/courses/${courseId}`);
+        if (courseResponse.ok) {
+          const courseDetails = await courseResponse.json();
+          console.log('Course details fetched:', courseDetails);
+          programId = courseDetails.batch?.programId;
+          console.log('Program ID from course details:', programId);
+        } else {
+          console.error('Failed to fetch course details:', courseResponse.status);
+        }
+      }
 
-      // [MOCK DATA] Mock mappings data
-      const mockMappings: Mapping[] = [
-        { coId: '1', poId: '1', level: 3 },
-        { coId: '1', poId: '2', level: 2 },
-        { coId: '2', poId: '2', level: 3 },
-        { coId: '2', poId: '3', level: 3 },
-        { coId: '3', poId: '3', level: 2 },
-        { coId: '3', poId: '5', level: 2 },
-        { coId: '4', poId: '2', level: 2 },
-        { coId: '4', poId: '5', level: 1 },
-        { coId: '5', poId: '9', level: 3 },
-        { coId: '5', poId: '10', level: 2 },
-      ];
+      if (programId) {
+        setProgramId(programId);
+        console.log('Fetching POs for program:', programId);
+        try {
+          // Fetch POs for the course's program
+          const posResponse = await fetch(`/api/pos?programId=${programId}`);
+          console.log('POs response status:', posResponse.status);
+          if (posResponse.ok) {
+            const posData = await posResponse.json();
+            console.log('POs fetched:', posData);
+            setPOs(posData);
+          } else {
+            console.error('Failed to fetch POs:', posResponse.status);
+            const errorText = await posResponse.text();
+            console.error('Error response:', errorText);
+          }
+        } catch (error) {
+          console.error('Error fetching POs:', error);
+        }
 
-      setCOs(mockCOs);
-      setPOs(mockPOs);
-      setMappings(mockMappings);
+        try {
+          // Fetch existing CO-PO mappings for this course
+          console.log('Fetching CO-PO mappings for course:', courseId);
+          const mappingsResponse = await fetch(`/api/co-po-mappings?courseId=${courseId}`);
+          console.log('Mappings response status:', mappingsResponse.status);
+          if (mappingsResponse.ok) {
+            const mappingsData = await mappingsResponse.json();
+            console.log('Mappings fetched:', mappingsData);
+            // Convert mappings data to the expected format
+            const formattedMappings = mappingsData.map((mapping: any) => ({
+              coId: mapping.coId,
+              poId: mapping.poId,
+              level: mapping.level
+            }));
+            setMappings(formattedMappings);
+          } else {
+            console.error('Failed to fetch mappings:', mappingsResponse.status);
+            const errorText = await mappingsResponse.text();
+            console.error('Error response:', errorText);
+          }
+        } catch (error) {
+          console.error('Error fetching mappings:', error);
+        }
+      } else {
+        console.warn('No program ID found, cannot fetch POs and mappings');
+      }
+      
+      console.log('=== CO-PO MAPPING: Data fetch complete ===');
     } catch (error) {
       console.error('Failed to fetch mapping data:', error);
     }
@@ -197,7 +214,7 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
       case 1: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 2: return 'bg-orange-100 text-orange-800 border-orange-200';
       case 3: return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -206,12 +223,26 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
       case 1: return 'Weak';
       case 2: return 'Medium';
       case 3: return 'Strong';
-      default: return 'No Mapping';
+      default: 'No Mapping';
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Debug Info */}
+      {isDebugMode && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h4 className="font-medium text-yellow-800 mb-2">Debug Info:</h4>
+          <div className="text-sm text-yellow-700 space-y-1">
+            <p>COs: {cos.length} found</p>
+            <p>POs: {pos.length} found</p>
+            <p>Mappings: {mappings.length} found</p>
+            <p>Course ID: {courseId}</p>
+            <p>Program ID: {programId}</p>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -251,68 +282,88 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
               </div>
             </div>
           </div>
+        </div>
 
           {/* Mapping Matrix */}
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="border border-gray-300 bg-gray-50 p-2 text-left font-medium">
-                    CO / PO
-                  </th>
-                  {pos.map((po) => (
-                    <th key={po.id} className="border border-gray-300 bg-gray-50 p-2 text-center min-w-24">
-                      <div className="space-y-1">
-                        <div className="font-medium">{po.code}</div>
-                        <div className="text-xs text-gray-600 max-w-20 truncate" title={po.description}>
-                          {po.description}
-                        </div>
-                      </div>
+          {cos.length === 0 ? (
+            <div className="text-center py-12">
+              <Target className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Course Outcomes</h3>
+              <p className="text-gray-600 mb-4">
+                Please add Course Outcomes first before creating CO-PO mappings
+              </p>
+            </div>
+          ) : pos.length === 0 ? (
+            <div className="text-center py-12">
+              <BarChart3 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Program Outcomes</h3>
+              <p className="text-gray-600 mb-4">
+                No Program Outcomes found for this course's program
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 bg-gray-50 p-2 text-left font-medium">
+                      CO / PO
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {cos.map((co) => (
-                  <tr key={co.id}>
-                    <td className="border border-gray-300 bg-gray-50 p-2">
-                      <div className="space-y-1">
-                        <div className="font-medium">{co.code}</div>
-                        <div className="text-xs text-gray-600 max-w-32 truncate" title={co.description}>
-                          {co.description}
+                    {pos.map((po) => (
+                      <th key={po.id} className="border border-gray-300 bg-gray-50 p-2 text-center min-w-24">
+                        <div className="space-y-1">
+                          <div className="font-medium">{po.code}</div>
+                          <div className="text-xs text-gray-600 max-w-20 truncate" title={po.description}>
+                            {po.description}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    {pos.map((po) => {
-                      const currentLevel = getMappingLevel(co.id, po.id);
-                      return (
-                        <td key={po.id} className="border border-gray-300 p-2">
-                          <Select
-                            value={currentLevel.toString()}
-                            onValueChange={(value) => updateMapping(co.id, po.id, parseInt(value))}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue>
-                                <Badge className={getLevelColor(currentLevel)}>
-                                  {getLevelLabel(currentLevel)}
-                                </Badge>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">0 - No Mapping</SelectItem>
-                              <SelectItem value="1">1 - Weak</SelectItem>
-                              <SelectItem value="2">2 - Medium</SelectItem>
-                              <SelectItem value="3">3 - Strong</SelectItem>
-                            </SelectContent>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {cos.map((co) => (
+                    <tr key={co.id}>
+                      <td className="border border-gray-300 bg-gray-50 p-2">
+                        <div className="space-y-1">
+                          <div className="font-medium">{co.code}</div>
+                          <div className="text-xs text-gray-600 max-w-32 truncate" title={co.description}>
+                            {co.description}
+                          </div>
+                        </div>
+                      </td>
+                      {pos.map((po) => {
+                        const currentLevel = getMappingLevel(co.id, po.id);
+                        return (
+                          <td key={po.id} className="border border-gray-300 p-2">
+                            <Select
+                              value={currentLevel.toString()}
+                              onValueChange={(value) => updateMapping(co.id, po.id, parseInt(value))}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue>
+                                  <Badge className={getLevelColor(currentLevel)}>
+                                    {getLevelLabel(currentLevel)}
+                                  </Badge>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">0 - No Mapping</SelectItem>
+                                <SelectItem value="1">1 - Weak</SelectItem>
+                                <SelectItem value="2">2 - Medium</SelectItem>
+                                <SelectItem value="3">3 - Strong</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </Select>
                         </td>
                       );
-                    })}
+                    )}
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -363,7 +414,7 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
               {mappings.filter(m => m.level > 0).length > 0 
                 ? (mappings.reduce((sum, m) => sum + m.level, 0) / mappings.filter(m => m.level > 0).length).toFixed(1)
                 : '0.0'
-              }
+              : '0.0'
             </div>
             <p className="text-xs text-gray-600">Average mapping level</p>
           </CardContent>
@@ -394,8 +445,8 @@ export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
               <ul className="text-sm text-green-700 space-y-1">
                 <li>• Ensure balanced distribution across POs</li>
                 <li>• Document rationale for strong mappings (level 3)</li>
-                <li>• Review mappings periodically with faculty</li>
-                <li>• Maintain consistency across courses in the program</li>
+                <li> Review mappings periodically with faculty</li>
+                <li> Maintain consistency across courses in the program</li>
               </ul>
             </div>
           </div>

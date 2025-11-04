@@ -83,7 +83,7 @@ export default function ProgramOutcomesPage() {
     if (isProgramCoordinator && user?.programId) {
       setSelectedProgramId(user.programId);
       // Also set the newPO programId for program coordinators
-      setNewPO(prev => ({ ...prev, programId: user.programId }));
+      setNewPO(prev => ({ ...prev, programId: user.programId || '' }));
     }
   }, [user]);
 
@@ -137,7 +137,7 @@ export default function ProgramOutcomesPage() {
   const handleOpenCreateDialog = () => {
     // Ensure the program ID is properly set when opening the dialog
     if (isProgramCoordinator && user?.programId) {
-      setNewPO(prev => ({ ...prev, programId: user.programId }));
+      setNewPO(prev => ({ ...prev, programId: user.programId || '' }));
     } else if (selectedProgramId) {
       setNewPO(prev => ({ ...prev, programId: selectedProgramId }));
     }

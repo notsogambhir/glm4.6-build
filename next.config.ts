@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/webp', 'image/avif'],
   },
+  // Turbopack configuration (empty to avoid webpack/turbopack conflict)
+  turbopack: {},
   // Suppress WebSocket errors in preview environments
   webpack: (config, { dev, isServer }) => {
     if (!dev || process.env.NODE_ENV === 'production') {

@@ -34,6 +34,7 @@ import {
   X
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { courseEvents } from '@/lib/course-events';
 
 interface CO {
   id: string;
@@ -106,6 +107,8 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
         setCOs(prev => [...prev, createdCO]);
         setNewCO({ description: '' });
         setIsAddDialogOpen(false);
+        // Emit event to notify other tabs
+        courseEvents.emit('co-updated');
         toast({
           title: "Success",
           description: `CO ${createdCO.code} added successfully`,
@@ -146,6 +149,8 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
           co.id === coId ? { ...co, description, isEditing: false } : co
         ));
         setEditingCO(null);
+        // Emit event to notify other tabs
+        courseEvents.emit('co-updated');
         toast({
           title: "Success",
           description: "CO updated successfully",
@@ -177,6 +182,8 @@ export function COsTab({ courseId, courseData }: COsTabProps) {
 
       if (response.ok) {
         setCOs(prev => prev.filter(co => co.id !== coId));
+        // Emit event to notify other tabs
+        courseEvents.emit('co-updated');
         toast({
           title: "Success",
           description: "CO deleted successfully",

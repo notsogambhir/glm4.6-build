@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     console.log('Course IDs:', courseIds);
     console.log('User:', { id: user.id, role: user.role, name: user.name });
 
-    let results = [];
-    let errors = [];
+    let results: any[] = [];
+    let errors: any[] = [];
 
     // Verify user has access to all courses
     const courses = await db.course.findMany({

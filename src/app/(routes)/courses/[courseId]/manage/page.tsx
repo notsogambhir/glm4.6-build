@@ -16,6 +16,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import Link from 'next/link';
+import { courseEvents } from '@/lib/course-events';
 
 // Import tab components
 import { OverviewTab } from '@/components/course/tabs/overview-tab';
@@ -52,6 +53,17 @@ export default function ManageCoursePage() {
 
   useEffect(() => {
     fetchCourse();
+    
+    // Listen for CO updates to refresh course data
+    const handleCOUpdate = () => {
+      fetchCourse();
+    };
+    
+    courseEvents.on('co-updated', handleCOUpdate);
+    
+    return () => {
+      courseEvents.off('co-updated', handleCOUpdate);
+    };
   }, [courseId]);
 
   const fetchCourse = async () => {

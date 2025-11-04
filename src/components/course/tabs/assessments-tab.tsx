@@ -33,6 +33,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { courseEvents } from '@/lib/course-events';
 import Link from 'next/link';
 
 interface Assessment {
@@ -70,6 +71,17 @@ export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
     } else {
       fetchAssessments();
     }
+    
+    // Listen for CO updates (in case assessments need to refresh CO-related data)
+    const handleCOUpdate = () => {
+      fetchAssessments();
+    };
+    
+    courseEvents.on('co-updated', handleCOUpdate);
+    
+    return () => {
+      courseEvents.off('co-updated', handleCOUpdate);
+    };
   }, [courseId, courseData]);
 
   const fetchAssessments = async () => {
