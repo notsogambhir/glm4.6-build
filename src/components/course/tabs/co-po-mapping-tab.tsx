@@ -28,17 +28,54 @@ interface Mapping {
 
 interface COPOMappingTabProps {
   courseId: string;
+  courseData?: any;
 }
 
-export function COPOMappingTab({ courseId }: COPOMappingTabProps) {
+export function COPOMappingTab({ courseId, courseData }: COPOMappingTabProps) {
   const [cos, setCOs] = useState<CO[]>([]);
   const [pos, setPOs] = useState<PO[]>([]);
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, [courseId]);
+    if (courseData?.courseOutcomes) {
+      setCOs(courseData.courseOutcomes);
+      fetchPOsAndMappings();
+    } else {
+      fetchData();
+    }
+  }, [courseId, courseData]);
+
+  const fetchPOsAndMappings = async () => {
+    try {
+      if (!courseData?.batch?.programId) {
+        console.warn('No program ID found in course data');
+        return;
+      }
+
+      // Fetch POs for the course's program
+      const posResponse = await fetch(`/api/pos?programId=${courseData.batch.programId}`);
+      if (posResponse.ok) {
+        const posData = await posResponse.json();
+        setPOs(posData);
+      }
+
+      // Fetch existing CO-PO mappings for this course
+      const mappingsResponse = await fetch(`/api/co-po-mappings?courseId=${courseId}`);
+      if (mappingsResponse.ok) {
+        const mappingsData = await mappingsResponse.json();
+        // Convert mappings data to the expected format
+        const formattedMappings = mappingsData.map((mapping: any) => ({
+          coId: mapping.coId,
+          poId: mapping.poId,
+          level: mapping.level
+        }));
+        setMappings(formattedMappings);
+      }
+    } catch (error) {
+      console.error('Failed to fetch POs and mappings:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -115,13 +152,36 @@ export function COPOMappingTab({ courseId }: COPOMappingTabProps) {
   const handleSave = async () => {
     setLoading(true);
     try {
-      // [MOCK API] Save mappings to API
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      // Save all mappings to the API
+      const savePromises = mappings.map(async (mapping) => {
+        const response = await fetch('/api/co-po-mappings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            courseId,
+            coId: mapping.coId,
+            poId: mapping.poId,
+            level: mapping.level
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to save mapping for CO-PO: ${mapping.coId}-${mapping.poId}`);
+        }
+        
+        return response.json();
+      });
+
+      await Promise.all(savePromises);
+      
       toast({
         title: "Success",
         description: "CO-PO mappings saved successfully",
       });
     } catch (error) {
+      console.error('Error saving mappings:', error);
       toast({
         title: "Error",
         description: "Failed to save mappings",

@@ -30,11 +30,18 @@ interface Course {
   code: string;
   name: string;
   semester: string;
-  students: number;
-  assessments: number;
-  cos: number;
+  description?: string;
+  status: string;
   programName: string;
   batchName: string;
+  stats: {
+    students: number;
+    assessments: number;
+    cos: number;
+  };
+  courseOutcomes: any[];
+  assessments: any[];
+  enrollments: any[];
 }
 
 export default function ManageCoursePage() {
@@ -50,19 +57,12 @@ export default function ManageCoursePage() {
   const fetchCourse = async () => {
     setLoading(true);
     try {
-      // [MOCK DATA] Mock data for now
-      const mockCourse: Course = {
-        id: courseId,
-        code: 'CS101',
-        name: 'Introduction to Programming',
-        semester: '1st',
-        students: 60,
-        assessments: 3,
-        cos: 5,
-        programName: 'BE ME',
-        batchName: '2021-2025'
-      };
-      setCourse(mockCourse);
+      const response = await fetch(`/api/courses/${courseId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch course');
+      }
+      const courseData = await response.json();
+      setCourse(courseData);
     } catch (error) {
       console.error('Failed to fetch course:', error);
     } finally {
@@ -110,6 +110,12 @@ export default function ManageCoursePage() {
                 <span>{course.semester} Semester</span>
                 <Badge variant="outline" className="text-xs">{course.programName}</Badge>
                 <Badge variant="secondary" className="text-xs">{course.batchName}</Badge>
+                <Badge 
+                  variant={course.status === 'ACTIVE' ? 'default' : course.status === 'COMPLETED' ? 'secondary' : 'outline'} 
+                  className="text-xs"
+                >
+                  {course.status}
+                </Badge>
               </div>
             </div>
           </div>
@@ -123,7 +129,7 @@ export default function ManageCoursePage() {
             <div className="flex items-center gap-3">
               <Users className="h-4 w-4 text-blue-600" />
               <div>
-                <div className="text-lg font-semibold">{course.students}</div>
+                <div className="text-lg font-semibold">{course.stats.students}</div>
                 <p className="text-xs text-gray-500">Students</p>
               </div>
             </div>
@@ -135,7 +141,7 @@ export default function ManageCoursePage() {
             <div className="flex items-center gap-3">
               <FileText className="h-4 w-4 text-green-600" />
               <div>
-                <div className="text-lg font-semibold">{course.assessments}</div>
+                <div className="text-lg font-semibold">{course.stats.assessments}</div>
                 <p className="text-xs text-gray-500">Assessments</p>
               </div>
             </div>
@@ -147,7 +153,7 @@ export default function ManageCoursePage() {
             <div className="flex items-center gap-3">
               <Target className="h-4 w-4 text-purple-600" />
               <div>
-                <div className="text-lg font-semibold">{course.cos}</div>
+                <div className="text-lg font-semibold">{course.stats.cos}</div>
                 <p className="text-xs text-gray-500">COs</p>
               </div>
             </div>
@@ -197,27 +203,27 @@ export default function ManageCoursePage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <OverviewTab courseId={courseId} />
+          <OverviewTab courseId={courseId} courseData={course} />
         </TabsContent>
 
         <TabsContent value="cos">
-          <COsTab courseId={courseId} />
+          <COsTab courseId={courseId} courseData={course} />
         </TabsContent>
 
         <TabsContent value="assessments">
-          <AssessmentsTab courseId={courseId} />
+          <AssessmentsTab courseId={courseId} courseData={course} />
         </TabsContent>
 
         <TabsContent value="co-po-mapping">
-          <COPOMappingTab courseId={courseId} />
+          <COPOMappingTab courseId={courseId} courseData={course} />
         </TabsContent>
 
         <TabsContent value="co-attainments">
-          <COAttainmentsTab courseId={courseId} />
+          <COAttainmentsTab courseId={courseId} courseData={course} />
         </TabsContent>
 
         <TabsContent value="student-reports">
-          <StudentReportsTab courseId={courseId} />
+          <StudentReportsTab courseId={courseId} courseData={course} />
         </TabsContent>
       </Tabs>
     </div>

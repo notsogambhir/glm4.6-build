@@ -47,9 +47,10 @@ interface Assessment {
 
 interface AssessmentsTabProps {
   courseId: string;
+  courseData?: any;
 }
 
-export function AssessmentsTab({ courseId }: AssessmentsTabProps) {
+export function AssessmentsTab({ courseId, courseData }: AssessmentsTabProps) {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newAssessment, setNewAssessment] = useState({
@@ -60,42 +61,20 @@ export function AssessmentsTab({ courseId }: AssessmentsTabProps) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchAssessments();
-  }, [courseId]);
+    if (courseData?.assessments) {
+      setAssessments(courseData.assessments);
+    } else {
+      fetchAssessments();
+    }
+  }, [courseId, courseData]);
 
   const fetchAssessments = async () => {
     try {
-      // [MOCK DATA] Mock data for now
-      const mockAssessments: Assessment[] = [
-        {
-          id: '1',
-          name: 'Mid Term Examination',
-          type: 'Internal',
-          totalMarks: 50,
-          questions: 5,
-          marksUploaded: true,
-          createdAt: '2024-01-10',
-        },
-        {
-          id: '2',
-          name: 'Lab Assessment 1',
-          type: 'Internal',
-          totalMarks: 25,
-          questions: 3,
-          marksUploaded: true,
-          createdAt: '2024-01-08',
-        },
-        {
-          id: '3',
-          name: 'Final Examination',
-          type: 'External',
-          totalMarks: 100,
-          questions: 10,
-          marksUploaded: false,
-          createdAt: '2024-01-15',
-        },
-      ];
-      setAssessments(mockAssessments);
+      const response = await fetch(`/api/courses/${courseId}`);
+      if (response.ok) {
+        const courseData = await response.json();
+        setAssessments(courseData.assessments || []);
+      }
     } catch (error) {
       console.error('Failed to fetch assessments:', error);
     }

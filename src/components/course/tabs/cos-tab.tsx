@@ -44,9 +44,10 @@ interface CO {
 
 interface COsTabProps {
   courseId: string;
+  courseData?: any;
 }
 
-export function COsTab({ courseId }: COsTabProps) {
+export function COsTab({ courseId, courseData }: COsTabProps) {
   const [cos, setCOs] = useState<CO[]>([]);
   const [newCO, setNewCO] = useState({ description: '' });
   const [editingCO, setEditingCO] = useState<string | null>(null);
@@ -54,20 +55,20 @@ export function COsTab({ courseId }: COsTabProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchCOs();
-  }, [courseId]);
+    if (courseData?.courseOutcomes) {
+      setCOs(courseData.courseOutcomes);
+    } else {
+      fetchCOs();
+    }
+  }, [courseId, courseData]);
 
   const fetchCOs = async () => {
     try {
-      // [MOCK DATA] Mock data for now
-      const mockCOs: CO[] = [
-        { id: '1', code: 'CO1', description: 'Understand fundamental programming concepts and problem-solving techniques' },
-        { id: '2', code: 'CO2', description: 'Design and implement algorithms using appropriate data structures' },
-        { id: '3', code: 'CO3', description: 'Apply programming skills to solve real-world problems' },
-        { id: '4', code: 'CO4', description: 'Analyze and debug code effectively' },
-        { id: '5', code: 'CO5', description: 'Work collaboratively on software development projects' },
-      ];
-      setCOs(mockCOs);
+      const response = await fetch(`/api/courses/${courseId}`);
+      if (response.ok) {
+        const courseData = await response.json();
+        setCOs(courseData.courseOutcomes || []);
+      }
     } catch (error) {
       console.error('Failed to fetch COs:', error);
     }

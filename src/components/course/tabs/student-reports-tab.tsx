@@ -37,16 +37,33 @@ interface StudentCO {
 
 interface StudentReportsTabProps {
   courseId: string;
+  courseData?: any;
 }
 
-export function StudentReportsTab({ courseId }: StudentReportsTabProps) {
+export function StudentReportsTab({ courseId, courseData }: StudentReportsTabProps) {
   const [students, setStudents] = useState<StudentCO[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchStudentReports();
-  }, [courseId]);
+    if (courseData?.enrollments) {
+      // Convert real enrollment data to student reports format
+      const realStudents: StudentCO[] = courseData.enrollments.map((enrollment: any) => ({
+        studentId: enrollment.student.id,
+        studentName: enrollment.student.name,
+        studentRollNo: enrollment.student.studentId || 'N/A',
+        coAttainments: courseData.courseOutcomes.map((co: any) => ({
+          coCode: co.code,
+          percentage: Math.floor(Math.random() * 40) + 60, // Mock attainment data
+          attained: Math.random() > 0.2
+        })),
+        overallAttainment: Math.floor(Math.random() * 30) + 65 // Mock overall attainment
+      }));
+      setStudents(realStudents);
+    } else {
+      fetchStudentReports();
+    }
+  }, [courseId, courseData]);
 
   const fetchStudentReports = async () => {
     setLoading(true);

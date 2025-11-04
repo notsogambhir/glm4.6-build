@@ -21,9 +21,10 @@ interface CourseSettings {
 
 interface OverviewTabProps {
   courseId: string;
+  courseData?: any;
 }
 
-export function OverviewTab({ courseId }: OverviewTabProps) {
+export function OverviewTab({ courseId, courseData }: OverviewTabProps) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<CourseSettings>({
     coTarget: 60,

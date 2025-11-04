@@ -346,6 +346,7 @@ async function createCOPOMappings() {
         selectedPOs.push(po.id);
         
         mappingData.push({
+          courseId: course.id,
           coId: co.id,
           poId: po.id,
           level: getRandomNumber(1, 3)
