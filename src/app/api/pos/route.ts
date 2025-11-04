@@ -6,13 +6,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const programId = searchParams.get('programId');
+    const includeInactive = searchParams.get('includeInactive') === 'true';
 
     const whereClause = programId ? { programId } : {};
 
     const pos = await db.pO.findMany({
       where: { 
         ...whereClause,
-        isActive: true 
+        ...(includeInactive ? {} : { isActive: true })
       },
       include: {
         program: {
@@ -81,10 +82,35 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingPO) {
-      return NextResponse.json(
-        { error: 'PO with this code already exists in this program' },
-        { status: 409 }
-      );
+      if (existingPO.isActive) {
+        // PO exists and is active
+        return NextResponse.json(
+          { error: 'PO with this code already exists in this program' },
+          { status: 409 }
+        );
+      } else {
+        // PO exists but is inactive - reactivate it
+        const reactivatedPO = await db.pO.update({
+          where: { id: existingPO.id },
+          data: {
+            description: description.trim(),
+            isActive: true
+          },
+          include: {
+            program: {
+              select: {
+                name: true,
+                code: true
+              }
+            }
+          }
+        });
+        
+        return NextResponse.json({
+          ...reactivatedPO,
+          reactivated: true
+        }, { status: 200 });
+      }
     }
 
     // Verify program exists

@@ -7,6 +7,7 @@ import { SidebarProvider } from '@/contexts/sidebar-context';
 import { Suspense } from 'react';
 import { PageLoading } from '@/components/ui/page-loading';
 import { NavigationLoading } from '@/components/ui/navigation-loading';
+import { ErrorSuppressor } from '@/components/error-suppressor';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +54,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <Suspense fallback={<PageLoading message="Initializing application..." />}>
+          <ErrorSuppressor />
           <AuthProvider>
             <SidebarProvider>
               <NavigationLoading />

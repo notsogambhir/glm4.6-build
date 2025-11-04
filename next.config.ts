@@ -17,6 +17,25 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/webp', 'image/avif'],
   },
+  // Suppress WebSocket errors in preview environments
+  webpack: (config, { dev, isServer }) => {
+    if (!dev || process.env.NODE_ENV === 'production') {
+      return config;
+    }
+    
+    // Suppress WebSocket connection errors in development
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /webpack-hot-middleware/,
+      },
+      {
+        message: /WebSocket connection failed/,
+      },
+    ];
+    
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -56,6 +56,7 @@ interface Program {
 export default function ProgramOutcomesPage() {
   const { user } = useAuth();
   const [pos, setPOs] = useState<PO[]>([]);
+  const [allPOs, setAllPOs] = useState<PO[]>([]); // For code generation
   const [programs, setPrograms] = useState<Program[]>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -67,6 +68,13 @@ export default function ProgramOutcomesPage() {
     description: ''
   });
 
+  // Auto-suggest PO code when program changes
+  useEffect(() => {
+    if (newPO.programId && !newPO.code) {
+      setNewPO(prev => ({ ...prev, code: getNextPOCode() }));
+    }
+  }, [newPO.programId, allPOs]);
+
   const isProgramCoordinator = user?.role === 'PROGRAM_COORDINATOR';
   const canManagePOs = ['PROGRAM_COORDINATOR', 'ADMIN', 'UNIVERSITY'].includes(user?.role || '');
 
@@ -74,14 +82,20 @@ export default function ProgramOutcomesPage() {
     fetchPrograms();
     if (isProgramCoordinator && user?.programId) {
       setSelectedProgramId(user.programId);
+      // Also set the newPO programId for program coordinators
+      setNewPO(prev => ({ ...prev, programId: user.programId }));
     }
   }, [user]);
 
   useEffect(() => {
     if (selectedProgramId) {
       fetchPOs();
+      // Update newPO programId when selection changes (for non-program coordinators)
+      if (!isProgramCoordinator) {
+        setNewPO(prev => ({ ...prev, programId: selectedProgramId }));
+      }
     }
-  }, [selectedProgramId]);
+  }, [selectedProgramId, isProgramCoordinator]);
 
   const fetchPrograms = async () => {
     try {
@@ -100,10 +114,18 @@ export default function ProgramOutcomesPage() {
     
     setLoading(true);
     try {
+      // Fetch active POs for display
       const response = await fetch(`/api/pos?programId=${selectedProgramId}`);
       if (response.ok) {
         const posData = await response.json();
         setPOs(posData);
+      }
+      
+      // Fetch all POs (including inactive) for code generation
+      const allResponse = await fetch(`/api/pos?programId=${selectedProgramId}&includeInactive=true`);
+      if (allResponse.ok) {
+        const allPosData = await allResponse.json();
+        setAllPOs(allPosData);
       }
     } catch (error) {
       console.error('Failed to fetch POs:', error);
@@ -112,8 +134,21 @@ export default function ProgramOutcomesPage() {
     }
   };
 
+  const handleOpenCreateDialog = () => {
+    // Ensure the program ID is properly set when opening the dialog
+    if (isProgramCoordinator && user?.programId) {
+      setNewPO(prev => ({ ...prev, programId: user.programId }));
+    } else if (selectedProgramId) {
+      setNewPO(prev => ({ ...prev, programId: selectedProgramId }));
+    }
+    setIsCreateDialogOpen(true);
+  };
+
   const handleCreatePO = async () => {
-    if (!newPO.programId || !newPO.code.trim() || !newPO.description.trim()) {
+    // Ensure programId is set before proceeding
+    const programIdToUse = newPO.programId || selectedProgramId;
+    
+    if (!programIdToUse || !newPO.code.trim() || !newPO.description.trim()) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -130,7 +165,7 @@ export default function ProgramOutcomesPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          programId: newPO.programId,
+          programId: programIdToUse,
           code: newPO.code.trim(),
           description: newPO.description.trim()
         }),
@@ -139,19 +174,41 @@ export default function ProgramOutcomesPage() {
       if (response.ok) {
         const createdPO = await response.json();
         setPOs(prev => [...prev, createdPO]);
-        setNewPO({ programId: '', code: '', description: '' });
+        setNewPO({ programId: isProgramCoordinator ? user?.programId || '' : selectedProgramId || '', code: '', description: '' });
         setIsCreateDialogOpen(false);
-        toast({
-          title: "Success",
-          description: `PO ${createdPO.code} created successfully`,
-        });
+        
+        if (createdPO.reactivated) {
+          toast({
+            title: "PO Reactivated",
+            description: `PO ${createdPO.code} has been reactivated successfully`,
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: `PO ${createdPO.code} created successfully`,
+          });
+        }
       } else {
         const error = await response.json();
-        toast({
-          title: "Error",
-          description: error.error || "Failed to create PO",
-          variant: "destructive",
-        });
+        
+        // Handle specific error cases
+        if (response.status === 409) {
+          // Conflict - PO code already exists
+          toast({
+            title: "Duplicate PO Code",
+            description: `PO ${newPO.code} already exists. Please use a different code.`,
+            variant: "destructive",
+          });
+          // Auto-suggest next available code
+          const nextCode = getNextPOCode();
+          setNewPO(prev => ({ ...prev, code: nextCode }));
+        } else {
+          toast({
+            title: "Error",
+            description: error.error || "Failed to create PO",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
       toast({
@@ -247,8 +304,27 @@ export default function ProgramOutcomesPage() {
 
   const getNextPOCode = () => {
     if (!selectedProgramId) return 'PO1';
-    const maxNumber = Math.max(...pos.map(po => parseInt(po.code.replace('PO', '')) || 0));
-    return `PO${maxNumber + 1}`;
+    
+    // Get existing PO codes (both active and inactive) and find the next available number
+    const existingNumbers = allPOs
+      .map(po => {
+        const match = po.code.match(/PO(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .filter(num => num > 0)
+      .sort((a, b) => a - b);
+    
+    if (existingNumbers.length === 0) return 'PO1';
+    
+    // Find the first missing number in the sequence
+    for (let i = 1; i <= existingNumbers.length + 1; i++) {
+      if (!existingNumbers.includes(i)) {
+        return `PO${i}`;
+      }
+    }
+    
+    // If all numbers are taken, use the next one
+    return `PO${existingNumbers.length + 1}`;
   };
 
   return (
@@ -262,7 +338,7 @@ export default function ProgramOutcomesPage() {
         {canManagePOs && (
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button onClick={handleOpenCreateDialog}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add PO
               </Button>
@@ -403,7 +479,7 @@ export default function ProgramOutcomesPage() {
                   Start by adding your first Program Outcome
                 </p>
                 {canManagePOs && (
-                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Button onClick={handleOpenCreateDialog}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add First PO
                   </Button>

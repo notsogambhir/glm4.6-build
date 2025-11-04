@@ -56,7 +56,6 @@ export function LoginForm() {
   const fetchBatches = async () => {
     // Don't fetch batches initially - they require a programId
     // Batches will be fetched when needed (after program selection)
-    console.log('Batches will be fetched when program is selected');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

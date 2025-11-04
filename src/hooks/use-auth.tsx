@@ -34,14 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     checkAuth();
-    
-    // Add a timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      console.log('Auth check timed out, setting loading to false');
-    }, 5000); // 5 second timeout
-    
-    return () => clearTimeout(timeout);
   }, []);
 
   // Save user to localStorage whenever it changes
@@ -74,32 +66,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(authUserToUser(parsedUser));
           }
           console.log('Using stored user data:', parsedUser);
+          
+          // If we have stored user data, set loading to false immediately
+          // and verify with server in the background
+          setLoading(false);
+          
+          // Verify with server in background (don't block UI)
+          verifyWithServer();
+          return;
         } catch (error) {
           console.error('Failed to parse stored user:', error);
           localStorage.removeItem('obe-user');
         }
       }
 
-      // Then verify with server (but don't override if we already have a user)
+      // If no stored user, verify with server
+      await verifyWithServer();
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setUser(null);
+      setLoading(false);
+    }
+  };
+
+  const verifyWithServer = async () => {
+    // Add a timeout to the fetch request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
+    try {
       const response = await fetch(`/api/auth/me`, {
         credentials: 'include',
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      
       if (response.ok) {
         const data = await response.json();
         setUser(authUserToUser(data.user));
         // Update localStorage with fresh user data
         localStorage.setItem('obe-user', JSON.stringify(data.user));
-        console.log('Auth check successful, user:', data.user);
+        console.log('Server auth check successful, user:', data.user);
       } else {
-        console.log('Auth check failed:', response.status);
-        // Only set user to null if we don't have stored data
-        if (!storedUser) {
-          setUser(null);
+        // Silently handle auth failures - don't log 401 errors as they're expected when not logged in
+        if (response.status !== 401) {
+          console.log('Server auth check failed:', response.status);
+        }
+        setUser(null);
+        localStorage.removeItem('obe-user');
+      }
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const error = fetchError as Error;
+      if (error.name === 'AbortError') {
+        console.log('Server auth check request timed out');
+      } else {
+        // Suppress network errors in development/preview environments
+        if (!error.message.includes('Failed to fetch') && !error.message.includes('NetworkError')) {
+          console.log('Server auth check request failed:', error.message);
         }
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      // Only set user to null if we don't have stored data
+      // Don't set user to null on network errors if we have stored data
       const storedUser = localStorage.getItem('obe-user');
       if (!storedUser) {
         setUser(null);
@@ -138,11 +166,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       console.log('Login successful, received data:', data);
-      setUser(authUserToUser(data.user));
+      
+      const userData = authUserToUser(data.user);
+      setUser(userData);
       
       // Update localStorage with the user data
       localStorage.setItem('obe-user', JSON.stringify(data.user));
       console.log('User data saved to localStorage');
+      
+      // Verify the login worked by checking auth status
+      setTimeout(async () => {
+        try {
+          const verifyResponse = await fetch('/api/auth/me', {
+            credentials: 'include',
+          });
+          if (verifyResponse.ok) {
+            console.log('Post-login verification successful');
+          } else {
+            console.log('Post-login verification failed, token may not be set yet');
+          }
+        } catch (error) {
+          console.log('Post-login verification error:', error);
+        }
+      }, 100);
       
     } catch (error) {
       console.error('Login failed:', error);
