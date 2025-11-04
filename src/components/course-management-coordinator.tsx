@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, BookOpen, ChevronDown, ChevronRight, Loader2, CheckCircle, Trash2, AlertTriangle, Edit } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, BookOpen, ChevronDown, ChevronRight, Loader2, CheckCircle, Trash2, AlertTriangle, Edit, CheckSquare, Square, X } from 'lucide-react';
 import Link from 'next/link';
 import { CourseCreation } from '@/components/course-creation';
 import { CourseBulkUpload } from '@/components/course-bulk-upload';
@@ -67,9 +68,30 @@ interface CourseCategoryProps {
   isProgramCoordinator: boolean;
   updatingCourseId?: string;
   deletingCourseId?: string;
+  selectedCourses: Set<string>;
+  onCourseSelect: (courseId: string, selected: boolean) => void;
+  onSelectAll: (selected: boolean) => void;
+  isAllSelected: boolean;
+  isIndeterminate: boolean;
 }
 
-function CourseCategory({ title, courses, status, defaultExpanded = false, onUpdateStatus, onDeleteCourse, onEditCourse, isProgramCoordinator, updatingCourseId, deletingCourseId }: CourseCategoryProps) {
+function CourseCategory({ 
+  title, 
+  courses, 
+  status, 
+  defaultExpanded = false, 
+  onUpdateStatus, 
+  onDeleteCourse, 
+  onEditCourse, 
+  isProgramCoordinator, 
+  updatingCourseId, 
+  deletingCourseId,
+  selectedCourses,
+  onCourseSelect,
+  onSelectAll,
+  isAllSelected,
+  isIndeterminate
+}: CourseCategoryProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   
   const getStatusColor = (courseStatus: string) => {
@@ -118,6 +140,16 @@ function CourseCategory({ title, courses, status, defaultExpanded = false, onUpd
             <BookOpen className="h-5 w-5" />
             {title} ({courses.length})
           </div>
+          {courses.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={isAllSelected}
+                onCheckedChange={onSelectAll}
+                className="mr-2"
+              />
+              <span className="text-sm text-gray-600">Select All</span>
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       {isExpanded && (
@@ -132,12 +164,19 @@ function CourseCategory({ title, courses, status, defaultExpanded = false, onUpd
                 <div 
                   key={course.id} 
                   className={`flex items-center justify-between p-3 border rounded-lg transition-all duration-300 ${
-                    isUpdating(course.id) 
-                      ? 'bg-yellow-50 border-yellow-200' 
-                      : 'hover:bg-gray-50'
+                    selectedCourses.has(course.id)
+                      ? 'bg-blue-50 border-blue-200' 
+                      : isUpdating(course.id) 
+                        ? 'bg-yellow-50 border-yellow-200' 
+                        : 'hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-center gap-3">
+                    <Checkbox
+                      checked={selectedCourses.has(course.id)}
+                      onCheckedChange={(checked) => onCourseSelect(course.id, checked as boolean)}
+                      className="mr-2"
+                    />
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getStatusColor(course.status)} transition-colors duration-300`}>
                       {isUpdating(course.id) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -275,6 +314,10 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
   const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // Multi-select state
+  const [selectedCourses, setSelectedCourses] = useState<Set<string>>(new Set());
+  const [batchOperationLoading, setBatchOperationLoading] = useState(false);
 
   const fetchCourses = async () => {
     try {
@@ -441,6 +484,125 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
     setIsEditModalOpen(false);
   };
 
+  // Multi-select handlers
+  const handleCourseSelect = (courseId: string, selected: boolean) => {
+    setSelectedCourses(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(courseId);
+      } else {
+        newSet.delete(courseId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (categoryCourses: Course[], selected: boolean) => {
+    setSelectedCourses(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        categoryCourses.forEach(course => newSet.add(course.id));
+      } else {
+        categoryCourses.forEach(course => newSet.delete(course.id));
+      }
+      return newSet;
+    });
+  };
+
+  const isAllSelectedInCategory = (categoryCourses: Course[]) => {
+    return categoryCourses.length > 0 && categoryCourses.every(course => selectedCourses.has(course.id));
+  };
+
+  const isIndeterminateInCategory = (categoryCourses: Course[]) => {
+    const selectedCount = categoryCourses.filter(course => selectedCourses.has(course.id)).length;
+    return selectedCount > 0 && selectedCount < categoryCourses.length;
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedCourses.size === 0) {
+      toast.error('No courses selected for deletion');
+      return;
+    }
+
+    try {
+      setBatchOperationLoading(true);
+      
+      const response = await fetch('/api/courses/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseIds: Array.from(selectedCourses),
+          action: 'delete'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(`Successfully deleted ${result.successCount} courses`);
+        if (result.errorCount > 0) {
+          toast.error(`${result.errorCount} courses could not be deleted`);
+        }
+        setSelectedCourses(new Set());
+        setRefreshKey(prev => prev + 1);
+      } else {
+        toast.error(result.message || 'Failed to delete courses');
+      }
+    } catch (error) {
+      console.error('Error in batch delete:', error);
+      toast.error('Error deleting courses');
+    } finally {
+      setBatchOperationLoading(false);
+    }
+  };
+
+  const handleBatchStatusUpdate = async (newStatus: 'FUTURE' | 'ACTIVE' | 'COMPLETED') => {
+    if (selectedCourses.size === 0) {
+      toast.error('No courses selected for status update');
+      return;
+    }
+
+    try {
+      setBatchOperationLoading(true);
+      
+      const response = await fetch('/api/courses/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseIds: Array.from(selectedCourses),
+          action: 'updateStatus',
+          data: { status: newStatus }
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(`Successfully updated status for ${result.successCount} courses`);
+        if (result.errorCount > 0) {
+          toast.error(`${result.errorCount} courses could not be updated`);
+        }
+        setSelectedCourses(new Set());
+        setRefreshKey(prev => prev + 1);
+      } else {
+        toast.error(result.message || 'Failed to update course status');
+      }
+    } catch (error) {
+      console.error('Error in batch status update:', error);
+      toast.error('Error updating course status');
+    } finally {
+      setBatchOperationLoading(false);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedCourses(new Set());
+  };
+
   // Group courses by status
   const futureCourses = courses.filter(course => course.status === 'FUTURE');
   const activeCourses = courses.filter(course => course.status === 'ACTIVE');
@@ -477,6 +639,93 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
         </div>
       </div>
 
+      {/* Batch Operations Toolbar */}
+      {selectedCourses.size > 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckSquare className="h-5 w-5 text-blue-600" />
+                <span className="font-medium text-blue-900">
+                  {selectedCourses.size} course{selectedCourses.size !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select onValueChange={(value: 'FUTURE' | 'ACTIVE' | 'COMPLETED') => handleBatchStatusUpdate(value)}>
+                  <SelectTrigger className="w-40 h-9">
+                    <SelectValue placeholder="Set Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FUTURE">Set as Future</SelectItem>
+                    <SelectItem value="ACTIVE">Set as Active</SelectItem>
+                    <SelectItem value="COMPLETED">Set as Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      disabled={batchOperationLoading}
+                      className="flex items-center gap-2"
+                    >
+                      {batchOperationLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Delete Selected
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                        Delete Selected Courses
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete <strong>{selectedCourses.size}</strong> selected course{selectedCourses.size !== 1 ? 's' : ''}?
+                        <br /><br />
+                        This action cannot be undone and will permanently delete all related data including:
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>Course information and settings</li>
+                          <li>Course outcomes (COs)</li>
+                          <li>Assessments and questions</li>
+                          <li>Student enrollments</li>
+                          <li>CO-PO mappings</li>
+                        </ul>
+                        <br />
+                        <strong>Note:</strong> Active courses with enrolled students cannot be deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleBatchDelete}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete {selectedCourses.size} Course{selectedCourses.size !== 1 ? 's' : ''}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={clearSelection}
+                  disabled={batchOperationLoading}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear Selection
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {showCreateForm && (
         <CourseCreation user={user} onCourseCreated={handleCourseCreated} />
       )}
@@ -506,6 +755,11 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
             isProgramCoordinator={true}
             updatingCourseId={updatingCourseId || undefined}
             deletingCourseId={deletingCourseId || undefined}
+            selectedCourses={selectedCourses}
+            onCourseSelect={handleCourseSelect}
+            onSelectAll={(selected) => handleSelectAll(activeCourses, selected)}
+            isAllSelected={isAllSelectedInCategory(activeCourses)}
+            isIndeterminate={isIndeterminateInCategory(activeCourses)}
           />
           <CourseCategory
             title="Future Courses"
@@ -518,6 +772,11 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
             isProgramCoordinator={true}
             updatingCourseId={updatingCourseId || undefined}
             deletingCourseId={deletingCourseId || undefined}
+            selectedCourses={selectedCourses}
+            onCourseSelect={handleCourseSelect}
+            onSelectAll={(selected) => handleSelectAll(futureCourses, selected)}
+            isAllSelected={isAllSelectedInCategory(futureCourses)}
+            isIndeterminate={isIndeterminateInCategory(futureCourses)}
           />
           <CourseCategory
             title="Completed Courses"
@@ -530,6 +789,11 @@ export function CourseManagementCoordinator({ user }: { user: User }) {
             isProgramCoordinator={true}
             updatingCourseId={updatingCourseId || undefined}
             deletingCourseId={deletingCourseId || undefined}
+            selectedCourses={selectedCourses}
+            onCourseSelect={handleCourseSelect}
+            onSelectAll={(selected) => handleSelectAll(completedCourses, selected)}
+            isAllSelected={isAllSelectedInCategory(completedCourses)}
+            isIndeterminate={isIndeterminateInCategory(completedCourses)}
           />
         </div>
       )}
