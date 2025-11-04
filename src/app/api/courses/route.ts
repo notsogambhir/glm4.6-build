@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
     
     // Get the authenticated user to check permissions
     const user = await getUserFromRequest(request);
-    console.log('Authenticated user:', user ? { id: user.id, role: user.role, batchId: user.batchId, collegeId: user.collegeId, departmentId: user.departmentId } : 'null');
+    console.log('Authenticated user:', user ? { id: user.id, role: user.role, batchId: user.batchId, collegeId: user.collegeId, departmentId: user.departmentId, programId: user.programId } : 'null');
     
     let courses;
+    let coursesCount = 0;
     
     if (batchId) {
       // If batchId is provided, get courses for that specific batch
@@ -65,6 +66,8 @@ export async function GET(request: NextRequest) {
           createdAt: 'desc'
         }
       });
+      coursesCount = courses.length;
+      console.log(`Found ${coursesCount} courses for batchId ${batchId}`);
     } else if (collegeId) {
       // If collegeId is provided, get courses from that college
       if (!user) {
@@ -211,6 +214,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log(`Returning ${coursesCount} courses`);
     return NextResponse.json(courses);
   } catch (error) {
     console.error('Error fetching courses:', error);
