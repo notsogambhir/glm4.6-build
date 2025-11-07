@@ -21,7 +21,7 @@ import { courseEvents } from '@/lib/course-events';
 // Import tab components
 import { OverviewTab } from '@/components/course/tabs/overview-tab';
 import { COsTab } from '@/components/course/tabs/cos-tab';
-import { AssessmentsTab } from '@/components/course/tabs/assessments-tab';
+import { AssessmentsTab } from '@/components/course/tabs/assessments-tab-new';
 import { COPOMappingTab } from '@/components/course/tabs/co-po-mapping-tab';
 import { COAttainmentsTab } from '@/components/course/tabs/co-attainments-tab';
 import { StudentReportsTab } from '@/components/course/tabs/student-reports-tab';
