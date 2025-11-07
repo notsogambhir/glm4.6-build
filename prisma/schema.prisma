@@ -120,7 +120,6 @@ model Course {
   code        String
   name        String
   batchId     String      // Course belongs to a specific batch
-  semester    String
   description String?
   status      CourseStatus @default(FUTURE)  // Track course status: FUTURE, ACTIVE, COMPLETED
   targetPercentage Float @default(50.0)     // Target percentage for CO attainment (e.g., 50%)

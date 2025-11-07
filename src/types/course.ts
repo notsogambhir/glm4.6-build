@@ -3,7 +3,6 @@ export type Course = {
   code: string;
   name: string;
   batchId: string;
-  semester: string;
   description: string | null | undefined;
   status: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
   isActive: boolean;
@@ -74,7 +73,6 @@ export type CourseFormData = {
   code: string;
   name: string;
   batchId: string;
-  semester: string;
   description?: string;
   status?: CourseStatus;
 };

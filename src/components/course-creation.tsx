@@ -79,7 +79,6 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
         code: courseCode.toUpperCase(),
         name: courseName.trim(),
         batchId: selectedBatch,
-        semester: "1st",
       });
       
       const response = await fetch('/api/courses', {
@@ -91,7 +90,6 @@ export function CourseCreation({ user, onCourseCreated }: CourseCreationProps) {
           code: courseCode.toUpperCase(),
           name: courseName.trim(),
           batchId: selectedBatch,
-          semester: "1st",
         }),
       });
 

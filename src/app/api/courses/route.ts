@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { code, name, semester, batchId, description } = body;
+    const { code, name, batchId, description } = body;
 
     if (!code || !name || !batchId) {
       return NextResponse.json({ 
@@ -295,7 +295,6 @@ export async function POST(request: NextRequest) {
       data: {
         code,
         name,
-        semester: semester || '',
         description: description || '',
         status: 'FUTURE',
         batchId

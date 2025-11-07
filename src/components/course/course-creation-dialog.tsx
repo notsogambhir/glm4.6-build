@@ -28,7 +28,6 @@ export function CourseCreationDialog({ batch, onSuccess }: CourseCreationDialogP
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    semester: '',
     description: '',
   });
   const { createCourse, isLoading, error, clearError } = useCourseStore();
@@ -44,7 +43,6 @@ export function CourseCreationDialog({ batch, onSuccess }: CourseCreationDialogP
       await createCourse({
         code: formData.code.trim(),
         name: formData.name.trim(),
-        semester: formData.semester.trim(),
         description: formData.description.trim(),
         status: 'FUTURE',
         batchId: batch.id,
@@ -55,7 +53,6 @@ export function CourseCreationDialog({ batch, onSuccess }: CourseCreationDialogP
       setFormData({
         code: '',
         name: '',
-        semester: '',
         description: '',
       });
 
@@ -113,18 +110,6 @@ export function CourseCreationDialog({ batch, onSuccess }: CourseCreationDialogP
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 className="col-span-3"
                 required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="semester" className="text-right">
-                Semester
-              </Label>
-              <Input
-                id="semester"
-                placeholder="e.g. 1st Semester"
-                value={formData.semester}
-                onChange={(e) => handleInputChange('semester', e.target.value)}
-                className="col-span-3"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
