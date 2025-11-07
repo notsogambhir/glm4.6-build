@@ -12,7 +12,8 @@ import {
   DialogContent, 
   DialogDescription, 
   DialogHeader, 
-  DialogTitle 
+  DialogTitle,
+  DialogTrigger 
 } from '@/components/ui/dialog';
 import { 
   Table, 
@@ -40,7 +41,8 @@ import {
   ChevronRight,
   FileSpreadsheet,
   Trash2,
-  X
+  X,
+  Download
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { courseEvents } from '@/lib/course-events';

@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactStrictMode: true,
+  reactStrictMode: false, // Temporarily disable strict mode
   serverExternalPackages: ['@radix-ui'],
   // Optimize for faster navigation
   experimental: {
@@ -19,13 +19,13 @@ const nextConfig: NextConfig = {
   },
   // Turbopack configuration (empty to avoid webpack/turbopack conflict)
   turbopack: {},
-  // Suppress WebSocket errors in preview environments
-  webpack: (config, { dev, isServer }) => {
-    if (!dev || process.env.NODE_ENV === 'production') {
-      return config;
-    }
+    // Suppress WebSocket errors in preview environments
+    webpack: (config, { dev, isServer }) => {
+      if (!dev || process.env.NODE_ENV === 'production') {
+        return config;
+      }
     
-    // Suppress WebSocket connection errors in development
+    // Suppress WebSocket errors in development
     config.ignoreWarnings = [
       ...(config.ignoreWarnings || []),
       {

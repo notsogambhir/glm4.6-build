@@ -3,11 +3,21 @@ import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { canManageCourse } from '@/lib/permissions';
 
+interface BulkQuestionsRequest {
+  questions: Array<{
+    question: string;
+    maxMarks: number;
+    coCodes: string | string[];
+  }>;
+}
+
 export async function POST(
   request: NextRequest,
-  { params }: { params: { courseId: string; assessmentId: string } }
+  context: { params: Promise<{ courseId: string; assessmentId: string; }>
 ) {
   try {
+    const resolvedParams = await context.params;
+    const { courseId, assessmentId } = resolvedParams;
     const user = await getUserFromRequest(request);
     if (!user) {
       return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
@@ -20,16 +30,15 @@ export async function POST(
       }, { status: 403 });
     }
 
-    const { questions } = await request.json();
-
-    if (!Array.isArray(questions) || questions.length === 0) {
+    const body: BulkQuestionsRequest = await request.json();
+    if (!Array.isArray(body.questions) || body.questions.length === 0) {
       return NextResponse.json({ error: 'Invalid questions data' }, { status: 400 });
     }
 
     // Get COs for this course to map CO codes to IDs
     const courseCOs = await db.cO.findMany({
       where: {
-        courseId: params.courseId,
+        courseId: courseId,
         isActive: true
       }
     });
@@ -41,13 +50,13 @@ export async function POST(
 
     // Process each question
     const createdQuestions = [];
-    for (const questionData of questions) {
+    for (const questionData of body.questions) {
       const { question, maxMarks, coCodes } = questionData;
-
+      
       if (!question || !maxMarks) {
         continue; // Skip invalid questions
       }
-
+      
       // Map CO codes to IDs
       const coIds: string[] = [];
       if (Array.isArray(coCodes)) {
@@ -59,15 +68,21 @@ export async function POST(
         }
       }
 
-      // Create the question
+      // Create question with string maxMarks
       const createdQuestion = await db.question.create({
         data: {
-          assessmentId: params.assessmentId,
+          assessmentId: assessmentId,
           question: question.trim(),
-          maxMarks: parseInt(maxMarks) || 10,
+          question: question.trim(),
+          maxMarks: String(maxMarks) || 10,
+          maxMarks: String(maxMarks) || 10,
+          isActive: true
           isActive: true
         }
+        }
       });
+      });
+
 
       // Create CO mappings
       if (coIds.length > 0) {
@@ -91,7 +106,6 @@ export async function POST(
       message: `Successfully created ${createdQuestions.length} questions`,
       questions: createdQuestions
     });
-
   } catch (error) {
     console.error('Error creating bulk questions:', error);
     return NextResponse.json(
@@ -99,4 +113,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
+  }

@@ -111,7 +111,23 @@ async function generateExtensiveMockData() {
     const students = [];
     const hashedPassword = await hashPassword('student123');
 
-    for (let i = 1; i <= 200; i++) {
+    // Find the highest existing student ID
+    const existingStudents = await db.user.findMany({
+      where: { role: 'STUDENT' },
+      select: { studentId: true },
+      orderBy: { studentId: 'desc' }
+    });
+    
+    let startId = 201; // Default start
+    if (existingStudents.length > 0) {
+      const highestId = existingStudents[0].studentId;
+      const numericId = parseInt(highestId.replace('STU', ''));
+      startId = numericId + 1;
+    }
+    
+    console.log(`Starting student generation from ID: STU${String(startId).padStart(6, '0')}`);
+
+    for (let i = startId; i <= startId + 199; i++) {
       const firstName = getRandomItem(firstNames);
       const lastName = getRandomItem(lastNames);
       const program = getRandomItem(programs);
