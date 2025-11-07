@@ -9,6 +9,8 @@ export interface StudentCOAttainment {
   metTarget: boolean;
   totalObtainedMarks: number;
   totalMaxMarks: number;
+  attemptedQuestions: number;
+  totalQuestions: number;
 }
 
 export interface ClassCOAttainment {
@@ -41,7 +43,12 @@ export interface COAttainmentSummary {
 
 export class COAttainmentCalculator {
   /**
-   * Step 1: Calculate a Single Student's Attainment for a Single CO
+   * Stage 1: Calculate Individual Student CO Attainment
+   * This follows the exact logic described:
+   * 1. Get all questions mapped to the specific CO
+   * 2. Get student's marks for ONLY attempted questions
+   * 3. Ignore unattempted questions completely (not treated as zero)
+   * 4. Calculate percentage based on attempted questions only
    */
   static async calculateStudentCOAttainment(
     courseId: string,
@@ -49,115 +56,140 @@ export class COAttainmentCalculator {
     studentId: string
   ): Promise<StudentCOAttainment | null> {
     try {
-      // Get all questions mapped to this specific CO
-      const questions = await db.question.findMany({
+      console.log(`🔍 Calculating CO attainment for student ${studentId}, CO ${coId}, course ${courseId}`);
+
+      // Step 1: Get all questions mapped to this specific CO for this course
+      const coQuestionMappings = await db.questionCOMapping.findMany({
         where: {
-          coMappings: {
-            some: {
-              coId: coId
+          coId: coId,
+          question: {
+            assessment: {
+              courseId: courseId
             }
-          },
-          assessment: {
-            courseId: courseId
           }
         },
         include: {
-          assessment: {
-            select: {
-              id: true,
-              name: true
+          question: {
+            include: {
+              assessment: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true
+                }
+              }
             }
           }
         }
       });
 
-      if (questions.length === 0) {
-        console.log(`No questions found for CO ${coId} in course ${courseId}`);
+      if (coQuestionMappings.length === 0) {
+        console.log(`❌ No questions found for CO ${coId} in course ${courseId}`);
         return null;
       }
 
-      // Get student's submitted marks for these questions
-      // Note: This assumes we have a student submission/marks table
-      // For now, we'll simulate this data structure
-      const studentMarks = await this.getStudentMarksForQuestions(
-        studentId,
-        questions.map(q => q.id)
-      );
+      const questionIds = coQuestionMappings.map(mapping => mapping.questionId);
+      const totalQuestions = questionIds.length;
 
-      if (studentMarks.length === 0) {
-        console.log(`No marks found for student ${studentId} for CO ${coId} questions`);
-        return null;
-      }
-
-      // Calculate total obtained and maximum marks
-      let totalObtainedMarks = 0;
-      let totalMaxMarks = 0;
-
-      questions.forEach(question => {
-        const studentMark = studentMarks.find(mark => mark.questionId === question.id);
-        if (studentMark) {
-          totalObtainedMarks += studentMark.obtainedMarks;
-          totalMaxMarks += question.maxMarks;
+      // Step 2: Get student's marks for these questions (only attempted ones)
+      const studentMarks = await db.studentMark.findMany({
+        where: {
+          studentId: studentId,
+          questionId: {
+            in: questionIds
+          }
         }
       });
 
-      if (totalMaxMarks === 0) {
+      if (studentMarks.length === 0) {
+        console.log(`⚠️ No marks found for student ${studentId} for CO ${coId} questions`);
+        // This means student attempted no questions for this CO
         return null;
       }
 
-      // Calculate percentage
+      // Step 3: Calculate totals for ATTEMPTED questions only
+      let totalObtainedMarks = 0;
+      let totalMaxMarks = 0;
+      let attemptedQuestions = 0;
+
+      // Process each attempted question
+      for (const mark of studentMarks) {
+        totalObtainedMarks += mark.obtainedMarks;
+        totalMaxMarks += mark.maxMarks;
+        attemptedQuestions++;
+      }
+
+      // Step 4: Calculate percentage based on attempted questions only
+      if (totalMaxMarks === 0) {
+        console.log(`❌ No maximum marks found for student ${studentId} in CO ${coId}`);
+        return null;
+      }
+
       const percentage = (totalObtainedMarks / totalMaxMarks) * 100;
 
-      // Get student info
-      const student = await db.user.findUnique({
-        where: { id: studentId },
-        select: { name: true }
-      });
+      // Get student and CO info
+      const [student, co] = await Promise.all([
+        db.user.findUnique({
+          where: { id: studentId },
+          select: { name: true, studentId: true }
+        }),
+        db.cO.findUnique({
+          where: { id: coId },
+          select: { code: true }
+        })
+      ]);
 
-      // Get CO info
-      const co = await db.cO.findUnique({
-        where: { id: coId },
-        select: { code: true }
-      });
-
-      return {
+      const result = {
         studentId,
-        studentName: student?.name || 'Unknown',
+        studentName: student?.name || 'Unknown Student',
         coId,
         coCode: co?.code || 'Unknown',
         percentage: Math.round(percentage * 100) / 100, // Round to 2 decimal places
-        metTarget: false, // Will be determined by course target
+        metTarget: false, // Will be determined in next step
         totalObtainedMarks,
-        totalMaxMarks
+        totalMaxMarks,
+        attemptedQuestions,
+        totalQuestions
       };
+
+      console.log(`✅ Student ${studentId} CO ${coId}: ${result.percentage}% (${attemptedQuestions}/${totalQuestions} questions attempted)`);
+      
+      return result;
     } catch (error) {
-      console.error('Error calculating student CO attainment:', error);
+      console.error('❌ Error calculating student CO attainment:', error);
       return null;
     }
   }
 
   /**
-   * Step 2: Determine if a Student "Met the Target"
+   * Step 2: Determine if Student Met Target
+   * Compares individual student's percentage with course target
    */
   static async determineTargetMet(
     courseId: string,
     studentAttainment: StudentCOAttainment
   ): Promise<StudentCOAttainment> {
-    const course = await db.course.findUnique({
-      where: { id: courseId },
-      select: { targetPercentage: true }
-    });
+    try {
+      const course = await db.course.findUnique({
+        where: { id: courseId },
+        select: { targetPercentage: true }
+      });
 
-    const targetPercentage = course?.targetPercentage || 50.0;
-    
-    return {
-      ...studentAttainment,
-      metTarget: studentAttainment.percentage >= targetPercentage
-    };
+      const targetPercentage = course?.targetPercentage || 50.0;
+      
+      return {
+        ...studentAttainment,
+        metTarget: studentAttainment.percentage >= targetPercentage
+      };
+    } catch (error) {
+      console.error('❌ Error determining target met:', error);
+      return studentAttainment;
+    }
   }
 
   /**
-   * Step 3: Calculate the Percentage of Students Who Met the Target
+   * Stage 2: Overall Course CO Attainment Calculation
+   * Step A: Calculate Percentage of Students Who Met Target
    */
   static async calculateClassCOAttainment(
     courseId: string,
@@ -168,6 +200,8 @@ export class COAttainmentCalculator {
     }
   ): Promise<ClassCOAttainment | null> {
     try {
+      console.log(`📊 Calculating class CO attainment for CO ${coId}, course ${courseId}`);
+
       // Get course details for thresholds
       const course = await db.course.findUnique({
         where: { id: courseId },
@@ -180,6 +214,7 @@ export class COAttainmentCalculator {
       });
 
       if (!course) {
+        console.log(`❌ Course ${courseId} not found`);
         return null;
       }
 
@@ -193,6 +228,7 @@ export class COAttainmentCalculator {
       });
 
       if (!co) {
+        console.log(`❌ CO ${coId} not found`);
         return null;
       }
 
@@ -206,17 +242,21 @@ export class COAttainmentCalculator {
           student: {
             select: {
               id: true,
-              name: true
+              name: true,
+              studentId: true
             }
           }
         }
       });
 
       if (enrollments.length === 0) {
+        console.log(`❌ No enrollments found for course ${courseId}`);
         return null;
       }
 
-      // Calculate attainment for each student
+      console.log(`👥 Found ${enrollments.length} enrolled students`);
+
+      // Calculate individual attainment for each student
       const studentAttainments: StudentCOAttainment[] = [];
       
       for (const enrollment of enrollments) {
@@ -236,18 +276,23 @@ export class COAttainmentCalculator {
       }
 
       if (studentAttainments.length === 0) {
+        console.log(`❌ No valid student attainments calculated for CO ${coId}`);
         return null;
       }
+
+      console.log(`📈 Calculated attainments for ${studentAttainments.length} students`);
 
       // Count students meeting target
       const studentsMeetingTarget = studentAttainments.filter(
         attainment => attainment.metTarget
       ).length;
 
-      // Calculate percentage of students meeting target
+      // Step A: Calculate percentage of students meeting target
       const percentageMeetingTarget = (studentsMeetingTarget / studentAttainments.length) * 100;
 
-      // Step 4: Determine the Final Attainment Level
+      console.log(`🎯 ${studentsMeetingTarget}/${studentAttainments.length} students met target (${percentageMeetingTarget.toFixed(2)}%)`);
+
+      // Step B: Map success rate to final attainment level (buckets)
       let attainmentLevel = 0;
       
       if (percentageMeetingTarget >= course.level3Threshold) {
@@ -257,6 +302,8 @@ export class COAttainmentCalculator {
       } else if (percentageMeetingTarget >= course.level1Threshold) {
         attainmentLevel = 1;
       }
+
+      console.log(`🏆 Final attainment level: ${attainmentLevel}`);
 
       return {
         coId,
@@ -272,7 +319,7 @@ export class COAttainmentCalculator {
         level3Threshold: course.level3Threshold
       };
     } catch (error) {
-      console.error('Error calculating class CO attainment:', error);
+      console.error('❌ Error calculating class CO attainment:', error);
       return null;
     }
   }
@@ -288,6 +335,8 @@ export class COAttainmentCalculator {
     }
   ): Promise<COAttainmentSummary | null> {
     try {
+      console.log(`🚀 Starting course attainment calculation for course ${courseId}`);
+
       // Get course details
       const course = await db.course.findUnique({
         where: { id: courseId },
@@ -303,6 +352,7 @@ export class COAttainmentCalculator {
       });
 
       if (!course) {
+        console.log(`❌ Course ${courseId} not found`);
         return null;
       }
 
@@ -316,14 +366,19 @@ export class COAttainmentCalculator {
       });
 
       if (cos.length === 0) {
+        console.log(`❌ No COs found for course ${courseId}`);
         return null;
       }
+
+      console.log(`📚 Found ${cos.length} COs for course ${courseId}`);
 
       // Calculate attainment for each CO
       const coAttainments: ClassCOAttainment[] = [];
       const allStudentAttainments: StudentCOAttainment[] = [];
 
       for (const co of cos) {
+        console.log(`\n--- Processing CO: ${co.code} ---`);
+        
         const classAttainment = await this.calculateClassCOAttainment(
           courseId,
           co.id,
@@ -344,7 +399,8 @@ export class COAttainmentCalculator {
             student: {
               select: {
                 id: true,
-                name: true
+                name: true,
+                studentId: true
               }
             }
           }
@@ -369,6 +425,9 @@ export class COAttainmentCalculator {
 
       const totalStudents = new Set(allStudentAttainments.map(a => a.studentId)).size;
 
+      console.log(`\n✅ Course attainment calculation completed for ${courseId}`);
+      console.log(`📊 Summary: ${coAttainments.length} COs, ${totalStudents} students, ${allStudentAttainments.length} total attainments`);
+
       return {
         courseId: course.id,
         courseName: course.name,
@@ -383,7 +442,7 @@ export class COAttainmentCalculator {
         calculatedAt: new Date()
       };
     } catch (error) {
-      console.error('Error calculating course attainment:', error);
+      console.error('❌ Error calculating course attainment:', error);
       return null;
     }
   }
@@ -397,13 +456,15 @@ export class COAttainmentCalculator {
     academicYear?: string
   ): Promise<void> {
     try {
+      console.log(`💾 Saving ${studentAttainments.length} attainments to database`);
+
       const data = studentAttainments.map(attainment => ({
         courseId,
         coId: attainment.coId,
         studentId: attainment.studentId,
         percentage: attainment.percentage,
         metTarget: attainment.metTarget,
-        academicYear
+        academicYear: academicYear || '2023-24'
       }));
 
       // Use upsert to handle duplicates
@@ -415,7 +476,7 @@ export class COAttainmentCalculator {
                 courseId: item.courseId,
                 coId: item.coId,
                 studentId: item.studentId,
-                academicYear: item.academicYear || ''
+                academicYear: item.academicYear
               }
             },
             update: {
@@ -423,59 +484,79 @@ export class COAttainmentCalculator {
               metTarget: item.metTarget,
               calculatedAt: new Date()
             },
-            create: item
+            create: {
+              ...item,
+              calculatedAt: new Date()
+            }
           })
         )
       );
+
+      console.log(`✅ Successfully saved ${data.length} attainments`);
     } catch (error) {
-      console.error('Error saving attainments:', error);
+      console.error('❌ Error saving attainments:', error);
       throw error;
     }
   }
 
   /**
-   * Helper method to get student marks for questions
-   * This reads from a mock data file - in production, this would query a real database table
+   * Generate detailed report for a specific CO
    */
-  private static async getStudentMarksForQuestions(
-    studentId: string,
-    questionIds: string[]
-  ): Promise<Array<{ questionId: string; obtainedMarks: number }>> {
+  static async generateCOReport(
+    courseId: string,
+    coId: string
+  ): Promise<{
+    classAttainment: ClassCOAttainment | null;
+    studentBreakdown: StudentCOAttainment[];
+    examples: {
+      standardCase?: StudentCOAttainment;
+      unattemptedCase?: StudentCOAttainment;
+    };
+  } | null> {
     try {
-      // In a real implementation, this would query a student submissions/answers table
-      // For now, we'll read from the mock data file
-      const fs = await import('fs');
-      const path = await import('path');
+      const classAttainment = await this.calculateClassCOAttainment(courseId, coId);
       
-      const mockDataPath = path.join(process.cwd(), 'scripts', 'mock-student-marks.json');
-      
-      if (!fs.existsSync(mockDataPath)) {
-        console.log('Mock student marks file not found, generating random data');
-        // Generate random marks if file doesn't exist
-        return questionIds.map(questionId => ({
-          questionId,
-          obtainedMarks: Math.floor(Math.random() * 10) + 1
-        }));
+      if (!classAttainment) {
+        return null;
       }
+
+      // Get detailed student breakdown
+      const enrollments = await db.enrollment.findMany({
+        where: { courseId, isActive: true },
+        include: {
+          student: { select: { id: true, name: true } }
+        }
+      });
+
+      const studentBreakdown: StudentCOAttainment[] = [];
       
-      const mockData = JSON.parse(fs.readFileSync(mockDataPath, 'utf8'));
-      
-      // Filter marks for this student and the requested questions
-      const studentMarks = mockData
-        .filter((mark: any) => mark.studentId === studentId && questionIds.includes(mark.questionId))
-        .map((mark: any) => ({
-          questionId: mark.questionId,
-          obtainedMarks: mark.obtainedMarks
-        }));
-      
-      return studentMarks;
+      for (const enrollment of enrollments) {
+        const attainment = await this.calculateStudentCOAttainment(
+          courseId,
+          coId,
+          enrollment.student.id
+        );
+        
+        if (attainment) {
+          const withTarget = await this.determineTargetMet(courseId, attainment);
+          studentBreakdown.push(withTarget);
+        }
+      }
+
+      // Find examples for documentation
+      const examples = {
+        standardCase: studentBreakdown.find(s => s.attemptedQuestions === s.totalQuestions && s.metTarget),
+        unattemptedCase: studentBreakdown.find(s => s.attemptedQuestions < s.totalQuestions)
+      };
+
+      return {
+        classAttainment,
+        studentBreakdown,
+        examples
+      };
     } catch (error) {
-      console.error('Error reading student marks:', error);
-      // Fallback to random data
-      return questionIds.map(questionId => ({
-        questionId,
-        obtainedMarks: Math.floor(Math.random() * 10) + 1
-      }));
+      console.error('❌ Error generating CO report:', error);
+      return null;
     }
   }
 }
