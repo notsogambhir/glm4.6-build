@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { auth } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/server-auth';
+import { canManageCourse } from '@/lib/permissions';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { courseId: string; assessmentId: string } }
 ) {
   try {
-    const user = await auth(request);
+    const user = await getUserFromRequest(request);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
+    }
+
+    // Check if user can manage this course
+    if (!canManageCourse(user)) {
+      return NextResponse.json({ 
+        error: 'Insufficient permissions. Only admin, university, department, and program coordinator roles can manage assessments.' 
+      }, { status: 403 });
     }
 
     const { questions } = await request.json();
