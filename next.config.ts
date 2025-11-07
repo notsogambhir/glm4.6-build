@@ -12,8 +12,6 @@ const nextConfig: NextConfig = {
   // Improve caching and performance
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
-    // Enable more aggressive optimizations in production
-    swcMinify: true,
   },
   // Optimize images
   images: {

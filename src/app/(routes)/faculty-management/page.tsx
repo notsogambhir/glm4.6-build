@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Users, UserPlus, Search, Loader2, CheckCircle, AlertCircle, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Dialog,
   DialogContent,
@@ -22,12 +23,14 @@ import {
 
 interface User {
   id: string;
-  email: string;
+  email?: string;
+  employeeId?: string;
   name: string;
   role: string;
   departmentId?: string;
   programId?: string;
   batchId?: string;
+  isActive: boolean;
   department?: {
     name: string;
     code: string;
@@ -39,6 +42,15 @@ interface User {
   batch?: {
     name: string;
   };
+  userDepartments?: {
+    id: string;
+    department: {
+      id: string;
+      name: string;
+      code: string;
+    };
+    isActive: boolean;
+  }[];
 }
 
 interface Program {
@@ -57,6 +69,7 @@ interface Department {
 }
 
 export default function FacultyManagement() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -70,17 +83,35 @@ export default function FacultyManagement() {
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    fetchUsers();
-    fetchPrograms();
-    fetchDepartments();
-  }, []);
+    if (user) {
+      fetchUsers();
+      fetchPrograms();
+      fetchDepartments();
+    }
+  }, [user]);
 
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/users');
       if (response.ok) {
         const data = await response.json();
-        setUsers(data.filter((user: User) => user.role === 'PROGRAM_COORDINATOR'));
+        // Filter based on current user role
+        let filteredUsers = data;
+        if (user?.role === 'DEPARTMENT') {
+          // Department users can see all non-student users in their department
+          filteredUsers = data.filter((u: User) => 
+            u.departmentId === user.departmentId && u.role !== 'STUDENT'
+          );
+        } else if (user?.role === 'PROGRAM_COORDINATOR') {
+          // Program coordinators can see all non-student users in their program
+          filteredUsers = data.filter((u: User) => 
+            u.programId === user.programId && u.role !== 'STUDENT'
+          );
+        } else {
+          // Admin and University users see program coordinators only
+          filteredUsers = data.filter((u: User) => u.role === 'PROGRAM_COORDINATOR');
+        }
+        setUsers(filteredUsers);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -159,14 +190,14 @@ export default function FacultyManagement() {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDepartment = !selectedDepartment || user.departmentId === selectedDepartment;
-    const matchesProgram = !selectedProgram || user.programId === selectedProgram;
+                         (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesDepartment = !selectedDepartment || selectedDepartment === 'all' || user.departmentId === selectedDepartment;
+    const matchesProgram = !selectedProgram || selectedProgram === 'all' || user.programId === selectedProgram;
     return matchesSearch && matchesDepartment && matchesProgram;
   });
 
   const availablePrograms = programs.filter(program => 
-    !selectedDepartment || program.departmentId === selectedDepartment
+    !selectedDepartment || selectedDepartment === 'all' || program.departmentId === selectedDepartment
   );
 
   if (loading) {
@@ -181,12 +212,22 @@ export default function FacultyManagement() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Faculty Management</h1>
-          <p className="text-gray-600 mt-2">Manage program coordinators and their program assignments</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === 'DEPARTMENT' ? 'Department Faculty' : 
+             user?.role === 'PROGRAM_COORDINATOR' ? 'Program Faculty' : 
+             'Faculty Management'}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {user?.role === 'DEPARTMENT' ? 'Manage faculty members in your department' :
+             user?.role === 'PROGRAM_COORDINATOR' ? 'Manage faculty members in your program' :
+             'Manage program coordinators and their program assignments'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Users className="h-6 w-6 text-red-600" />
-          <span className="text-lg font-semibold">{users.length} Program Coordinators</span>
+          <span className="text-lg font-semibold">
+            {users.length} {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' ? 'Faculty Members' : 'Program Coordinators'}
+          </span>
         </div>
       </div>
 
@@ -216,7 +257,7 @@ export default function FacultyManagement() {
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Departments</SelectItem>
+                  <SelectItem value="all">All Departments</SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
@@ -232,7 +273,7 @@ export default function FacultyManagement() {
                   <SelectValue placeholder="All Programs" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Programs</SelectItem>
+                  <SelectItem value="all">All Programs</SelectItem>
                   {programs.map((program) => (
                     <SelectItem key={program.id} value={program.id}>
                       {program.name}
@@ -245,61 +286,85 @@ export default function FacultyManagement() {
         </CardContent>
       </Card>
 
-      {/* Program Coordinators List */}
+      {/* Faculty List */}
       <Card>
         <CardHeader>
-          <CardTitle>Program Coordinators</CardTitle>
+          <CardTitle>
+            {user?.role === 'DEPARTMENT' ? 'Department Faculty Members' :
+             user?.role === 'PROGRAM_COORDINATOR' ? 'Program Faculty Members' :
+             'Program Coordinators'}
+          </CardTitle>
           <CardDescription>
-            Manage program coordinators and assign them to specific programs
+            {user?.role === 'DEPARTMENT' ? 'View and manage faculty members in your department' :
+             user?.role === 'PROGRAM_COORDINATOR' ? 'View and manage faculty members in your program' :
+             'Manage program coordinators and assign them to specific programs'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {filteredUsers.length === 0 ? (
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No program coordinators found</p>
+              <p className="text-gray-600">
+                {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' ? 
+                 'No faculty members found' : 'No program coordinators found'}
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredUsers.map((user) => (
+              {filteredUsers.map((userItem) => (
                 <div
-                  key={user.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                  key={userItem.id}
+                  className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 ${!userItem.isActive ? 'opacity-60' : ''}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                      <Users className="h-5 w-5 text-red-600" />
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${userItem.isActive ? 'bg-red-100' : 'bg-gray-100'}`}>
+                      <Users className={`h-5 w-5 ${userItem.isActive ? 'text-red-600' : 'text-gray-400'}`} />
                     </div>
                     <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <p className="font-medium">{userItem.name}</p>
+                      <p className="text-sm text-gray-600">{userItem.email}</p>
+                      {userItem.employeeId && (
+                        <p className="text-xs text-gray-500">ID: {userItem.employeeId}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs">
-                          {user.role.replace('_', ' ')}
+                          {userItem.role.replace('_', ' ')}
                         </Badge>
-                        {user.department && (
+                        {/* Show multiple departments for teachers */}
+                        {userItem.role === 'TEACHER' && userItem.userDepartments && userItem.userDepartments.length > 0 ? (
+                          userItem.userDepartments.map((ud, index) => (
+                            <Badge key={ud.id} variant="secondary" className="text-xs">
+                              {ud.department.name}
+                            </Badge>
+                          ))
+                        ) : userItem.department && userItem.role !== 'TEACHER' ? (
                           <Badge variant="secondary" className="text-xs">
-                            {user.department.name}
+                            {userItem.department.name}
                           </Badge>
-                        )}
-                        {user.program && (
+                        ) : null}
+                        {userItem.program && (
                           <Badge className="bg-red-100 text-red-800 text-xs">
-                            {user.program.name}
+                            {userItem.program.name}
                           </Badge>
                         )}
+                        <Badge variant={userItem.isActive ? "default" : "secondary"} className="text-xs">
+                          {userItem.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openAssignDialog(user)}
-                      className="flex items-center gap-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Assign Programs
-                    </Button>
+                    {user?.role === 'ADMIN' && userItem.role === 'PROGRAM_COORDINATOR' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAssignDialog(userItem)}
+                        className="flex items-center gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Assign Programs
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -17,11 +17,12 @@ model User {
   id          String   @id @default(cuid())
   email       String?  @unique
   studentId   String?  @unique  // Student ID for students (numeric or alphanumeric)
+  employeeId  String?  @unique  // Employee ID for staff/faculty
   password    String
   name        String
   role        UserRole @default(TEACHER)
   collegeId   String?
-  departmentId String?
+  departmentId String? // Keep for backward compatibility, but will be deprecated
   programId   String?
   batchId     String?  // Added for students
   isActive    Boolean  @default(true)
@@ -36,6 +37,7 @@ model User {
   enrollments Enrollment[]
   coAttainments COAttainment[]
   studentMarks StudentMark[]
+  userDepartments UserDepartment[]
   
   @@map("users")
 }
@@ -69,9 +71,25 @@ model Department {
   college     College  @relation(fields: [collegeId], references: [id])
   users       User[]
   programs    Program[]
+  userDepartments UserDepartment[]
   
   @@unique([collegeId, code])
   @@map("departments")
+}
+
+model UserDepartment {
+  id           String   @id @default(cuid())
+  userId       String
+  departmentId String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+  @@map("user_departments")
 }
 
 model Program {

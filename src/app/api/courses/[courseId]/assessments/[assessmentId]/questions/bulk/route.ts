@@ -13,7 +13,7 @@ interface BulkQuestionsRequest {
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ courseId: string; assessmentId: string; }>
+  context: { params: Promise<{ courseId: string; assessmentId: string; }> }
 ) {
   try {
     const resolvedParams = await context.params;
@@ -49,7 +49,7 @@ export async function POST(
     });
 
     // Process each question
-    const createdQuestions = [];
+    const createdQuestions: any[] = [];
     for (const questionData of body.questions) {
       const { question, maxMarks, coCodes } = questionData;
       
@@ -68,21 +68,15 @@ export async function POST(
         }
       }
 
-      // Create question with string maxMarks
+      // Create question
       const createdQuestion = await db.question.create({
         data: {
           assessmentId: assessmentId,
           question: question.trim(),
-          question: question.trim(),
-          maxMarks: String(maxMarks) || 10,
-          maxMarks: String(maxMarks) || 10,
-          isActive: true
+          maxMarks: typeof maxMarks === 'string' ? parseInt(maxMarks) : maxMarks || 10,
           isActive: true
         }
-        }
       });
-      });
-
 
       // Create CO mappings
       if (coIds.length > 0) {
@@ -113,4 +107,4 @@ export async function POST(
       { status: 500 }
     );
   }
-  }
+}
