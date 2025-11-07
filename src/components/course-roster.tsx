@@ -28,7 +28,6 @@ interface Student {
 interface EnrollmentRecord {
   enrollmentId: string;
   student: Student;
-  semester: string;
   enrolledAt: string;
 }
 
@@ -47,7 +46,6 @@ interface RosterData {
     courseInfo: {
       code: string;
       name: string;
-      semester: string;
       status: string;
       program: string;
       batch: string;
@@ -95,14 +93,13 @@ export function CourseRoster({ courseId, courseCode, courseName }: CourseRosterP
     if (!rosterData) return;
 
     // Create CSV content
-    const headers = ['Student ID', 'Student Name', 'Status', 'Program', 'Batch', 'Semester', 'Enrolled Date'];
+    const headers = ['Student ID', 'Student Name', 'Status', 'Program', 'Batch', 'Enrolled Date'];
     const rows = filteredRoster.map(enrollment => [
       enrollment.student.studentId,
       enrollment.student.studentName,
       enrollment.student.isActive ? 'Active' : 'Inactive',
       enrollment.student.program.name,
       enrollment.student.batch.name,
-      enrollment.semester,
       new Date(enrollment.enrolledAt).toLocaleDateString()
     ]);
 
@@ -194,7 +191,7 @@ export function CourseRoster({ courseId, courseCode, courseName }: CourseRosterP
               </Badge>
               <div>
                 <p className="text-sm font-medium text-gray-600">Course Status</p>
-                <p className="text-sm font-bold text-gray-900">{rosterData.summary.courseInfo.semester}</p>
+                <p className="text-sm font-bold text-gray-900">{rosterData.summary.courseInfo.status}</p>
               </div>
             </div>
           </CardContent>
@@ -210,7 +207,7 @@ export function CourseRoster({ courseId, courseCode, courseName }: CourseRosterP
           </CardTitle>
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600">
-              {rosterData.summary.courseInfo.program} • {rosterData.summary.courseInfo.batch} • {rosterData.summary.courseInfo.semester} Semester
+              {rosterData.summary.courseInfo.program} • {rosterData.summary.courseInfo.batch}
             </div>
             <div className="flex items-center gap-2">
               <Search className="h-4 w-4 text-gray-400" />
@@ -256,7 +253,6 @@ export function CourseRoster({ courseId, courseCode, courseName }: CourseRosterP
                     <TableHead>Status</TableHead>
                     <TableHead>Program</TableHead>
                     <TableHead>Batch</TableHead>
-                    <TableHead>Semester</TableHead>
                     <TableHead>Enrolled Date</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -286,7 +282,6 @@ export function CourseRoster({ courseId, courseCode, courseName }: CourseRosterP
                           {enrollment.student.batch.name}
                         </Badge>
                       </TableCell>
-                      <TableCell>{enrollment.semester}</TableCell>
                       <TableCell>
                         {new Date(enrollment.enrolledAt).toLocaleDateString()}
                       </TableCell>

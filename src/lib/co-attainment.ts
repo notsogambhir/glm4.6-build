@@ -28,7 +28,6 @@ export interface COAttainmentSummary {
   courseName: string;
   courseCode: string;
   academicYear?: string;
-  semester?: string;
   totalStudents: number;
   overallAttainment: {
     level0Count: number;
@@ -47,8 +46,7 @@ export class COAttainmentService {
   static async calculateStudentCOAttainment(
     studentId: string,
     coId: string,
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<{ percentage: number; metTarget: boolean }> {
     try {
       // Get all questions mapped to this CO
@@ -85,8 +83,7 @@ export class COAttainmentService {
         where: {
           studentId,
           questionId: { in: questionIds },
-          ...(academicYear && { academicYear }),
-          ...(semester && { semester })
+          ...(academicYear && { academicYear })
         }
       });
 
@@ -130,8 +127,7 @@ export class COAttainmentService {
   static async calculateCOAttainment(
     courseId: string,
     coId: string,
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<COAttainmentResult> {
     try {
       // Get CO and course details
@@ -193,8 +189,7 @@ export class COAttainmentService {
           const attainment = await this.calculateStudentCOAttainment(
             student.id,
             coId,
-            academicYear,
-            semester
+            academicYear
           );
           return {
             studentId: student.id,
@@ -245,8 +240,7 @@ export class COAttainmentService {
    */
   static async calculateCourseCOAttainment(
     courseId: string,
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<COAttainmentSummary> {
     try {
       // Get course details and COs
@@ -271,7 +265,7 @@ export class COAttainmentService {
       // Calculate attainment for each CO
       const coAttainments = await Promise.all(
         cos.map(co => 
-          this.calculateCOAttainment(courseId, co.id, academicYear, semester)
+          this.calculateCOAttainment(courseId, co.id, academicYear)
         )
       );
 
@@ -297,8 +291,7 @@ export class COAttainmentService {
             const studentAttainment = await this.calculateStudentCOAttainment(
               enrollment.student.id,
               co.id,
-              academicYear,
-              semester
+              academicYear
             );
 
             studentAttainments.push({
@@ -333,7 +326,6 @@ export class COAttainmentService {
         courseName: course.name,
         courseCode: course.code,
         academicYear,
-        semester,
         totalStudents,
         overallAttainment,
         coAttainments,
@@ -354,18 +346,16 @@ export class COAttainmentService {
     studentId: string,
     percentage: number,
     metTarget: boolean,
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<void> {
     try {
       await db.cOAttainment.upsert({
         where: {
-          courseId_coId_studentId_academicYear_semester: {
+          courseId_coId_studentId_academicYear: {
             courseId,
             coId,
             studentId,
-            academicYear: academicYear || '',
-            semester: semester || ''
+            academicYear: academicYear || ''
           }
         },
         update: {
@@ -379,8 +369,7 @@ export class COAttainmentService {
           studentId,
           percentage,
           metTarget,
-          academicYear,
-          semester
+          academicYear
         }
       });
     } catch (error) {
@@ -394,14 +383,12 @@ export class COAttainmentService {
    */
   static async batchSaveCOAttainments(
     courseId: string,
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<void> {
     try {
       const attainmentSummary = await this.calculateCourseCOAttainment(
         courseId,
-        academicYear,
-        semester
+        academicYear
       );
 
       // Save all student attainments
@@ -413,8 +400,7 @@ export class COAttainmentService {
             studentAttainment.studentId,
             studentAttainment.percentage,
             studentAttainment.metTarget,
-            academicYear,
-            semester
+            academicYear
           );
         })
       );

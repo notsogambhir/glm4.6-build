@@ -37,7 +37,6 @@ interface Course {
   id: string;
   code: string;
   name: string;
-  semester: string;
   status: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
   batch: {
     id: string;
@@ -144,7 +143,7 @@ function CourseCategory({ title, courses, status, defaultExpanded = false, onUpd
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{course.name}</p>
-                      <p className="text-xs text-gray-600">{course.code} • {course.semester} Semester</p>
+                      <p className="text-xs text-gray-600">{course.code}</p>
                       <p className="text-xs text-gray-500">{course.batch?.program?.name || 'Unknown Program'} • {course.batch?.name || 'Unknown Batch'}</p>
                       {status === 'ACTIVE' && course._count.enrollments > 0 && (
                         <p className="text-xs text-green-600 font-medium">

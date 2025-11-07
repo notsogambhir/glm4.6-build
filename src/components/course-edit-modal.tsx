@@ -19,7 +19,6 @@ interface Course {
   id: string;
   code: string;
   name: string;
-  semester: string;
   status: 'FUTURE' | 'ACTIVE' | 'COMPLETED';
   batch: {
     id: string;
@@ -180,7 +179,7 @@ export function CourseEditModal({ course, isOpen, onClose, onCourseUpdated }: Co
               {course.code} • {course.name}
             </p>
             <p className="text-xs text-gray-500">
-              {course.batch.program.name} • {course.batch.name} • {course.semester} Semester
+              {course.batch.program.name} • {course.batch.name}
             </p>
           </div>
 

@@ -193,11 +193,10 @@ export async function POST(
           // Upsert student marks
           await tx.studentMark.upsert({
             where: {
-              questionId_studentId_academicYear_semester: {
+              questionId_studentId_academicYear: {
                 questionId: mark.questionId,
                 studentId: result.studentId,
-                academicYear,
-                semester
+                academicYear
               }
             },
             update: {
@@ -211,7 +210,6 @@ export async function POST(
               obtainedMarks: mark.obtainedMarks,
               maxMarks: mark.maxMarks,
               academicYear,
-              semester,
               submittedAt: new Date()
             }
           });

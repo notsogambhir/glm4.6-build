@@ -13,7 +13,6 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     
     const academicYear = searchParams.get('academicYear') || undefined;
-    const semester = searchParams.get('semester') || undefined;
     const coId = searchParams.get('coId') || undefined;
 
     if (!courseId) {
@@ -42,15 +41,13 @@ export async function GET(
       result = await COAttainmentService.calculateCOAttainment(
         courseId,
         coId,
-        academicYear,
-        semester
+        academicYear
       );
     } else {
       // Calculate attainment for all COs in course
       result = await COAttainmentService.calculateCourseCOAttainment(
         courseId,
-        academicYear,
-        semester
+        academicYear
       );
     }
 
@@ -72,7 +69,7 @@ export async function POST(
     const resolvedParams = await params;
     const courseId = resolvedParams.courseId;
     const body = await request.json();
-    const { academicYear, semester } = body;
+    const { academicYear } = body;
 
     if (!courseId) {
       return NextResponse.json(
@@ -97,15 +94,13 @@ export async function POST(
     // Batch save CO attainments for all students
     await COAttainmentService.batchSaveCOAttainments(
       courseId,
-      academicYear,
-      semester
+      academicYear
     );
 
     // Return updated attainment results
     const result = await COAttainmentService.calculateCourseCOAttainment(
       courseId,
-      academicYear,
-      semester
+      academicYear
     );
 
     return NextResponse.json({

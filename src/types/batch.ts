@@ -39,7 +39,6 @@ export type BatchWithDetails = Batch & {
     id: string;
     code: string;
     name: string;
-    semester: string;
     status: string;
   }>;
   _count: {

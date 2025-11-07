@@ -165,7 +165,6 @@ export class COAttainmentCalculator {
     filters?: {
       section?: string;
       academicYear?: string;
-      semester?: string;
     }
   ): Promise<ClassCOAttainment | null> {
     try {
@@ -286,7 +285,6 @@ export class COAttainmentCalculator {
     filters?: {
       section?: string;
       academicYear?: string;
-      semester?: string;
     }
   ): Promise<COAttainmentSummary | null> {
     try {
@@ -396,8 +394,7 @@ export class COAttainmentCalculator {
   static async saveAttainments(
     courseId: string,
     studentAttainments: StudentCOAttainment[],
-    academicYear?: string,
-    semester?: string
+    academicYear?: string
   ): Promise<void> {
     try {
       const data = studentAttainments.map(attainment => ({
@@ -406,8 +403,7 @@ export class COAttainmentCalculator {
         studentId: attainment.studentId,
         percentage: attainment.percentage,
         metTarget: attainment.metTarget,
-        academicYear,
-        semester
+        academicYear
       }));
 
       // Use upsert to handle duplicates
@@ -415,12 +411,11 @@ export class COAttainmentCalculator {
         data.map(item =>
           db.cOAttainment.upsert({
             where: {
-              courseId_coId_studentId_academicYear_semester: {
+              courseId_coId_studentId_academicYear: {
                 courseId: item.courseId,
                 coId: item.coId,
                 studentId: item.studentId,
-                academicYear: item.academicYear || '',
-                semester: item.semester || ''
+                academicYear: item.academicYear || ''
               }
             },
             update: {

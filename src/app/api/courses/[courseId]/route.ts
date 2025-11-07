@@ -76,7 +76,6 @@ export async function GET(
       id: course.id,
       code: course.code,
       name: course.name,
-      semester: course.semester,
       description: course.description,
       status: course.status,
       isActive: course.isActive,

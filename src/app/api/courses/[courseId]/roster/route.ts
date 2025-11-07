@@ -51,8 +51,7 @@ export async function GET(
       studentName: enrollment.student.name,
       studentRollNo: enrollment.student.studentId,
       studentEmail: enrollment.student.email,
-      enrollmentDate: enrollment.createdAt,
-      semester: enrollment.semester
+      enrollmentDate: enrollment.createdAt
     }));
 
     return NextResponse.json(roster);
@@ -81,7 +80,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { studentIds, semester } = body;
+    const { studentIds } = body;
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return NextResponse.json({ error: 'Student IDs are required' }, { status: 400 });

@@ -49,15 +49,13 @@ export async function GET(
       result = await COAttainmentService.calculateStudentCOAttainment(
         studentId,
         coId,
-        academicYear,
-        semester
+        academicYear
       );
     } else {
       // Get all CO attainments for this student in the course
       const courseAttainment = await COAttainmentService.calculateCourseCOAttainment(
         courseId,
-        academicYear,
-        semester
+        academicYear
       );
       
       result = courseAttainment.studentAttainments.filter(

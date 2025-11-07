@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Process each course
     for (const courseData of courses) {
       try {
-        const { code, name, semester = "1st" } = courseData;
+        const { code, name } = courseData;
 
         // Validate course data
         if (!code || !name) {
@@ -85,7 +85,6 @@ export async function POST(request: NextRequest) {
             code: code.toUpperCase(),
             name: name.trim(),
             batchId,
-            semester: semester.toString() || "1st",
           },
           include: {
             batch: {

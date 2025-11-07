@@ -52,7 +52,7 @@ export async function GET(
       const classAttainment = await COAttainmentCalculator.calculateClassCOAttainment(
         courseId,
         coId,
-        { academicYear, semester }
+        { academicYear }
       );
 
       if (!classAttainment) {

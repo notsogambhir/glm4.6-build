@@ -255,7 +255,6 @@ model Enrollment {
   id         String   @id @default(cuid())
   courseId   String
   studentId  String
-  semester   String
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -276,13 +275,12 @@ model COAttainment {
   metTarget            Boolean  // Whether student met the course target
   calculatedAt         DateTime @default(now())
   academicYear         String?  // Academic year for filtering
-  semester             String?  // Semester for filtering
   
   course               Course   @relation(fields: [courseId], references: [id])
   co                   CO       @relation(fields: [coId], references: [id])
   student              User     @relation(fields: [studentId], references: [id])
   
-  @@unique([courseId, coId, studentId, academicYear, semester])
+  @@unique([courseId, coId, studentId, academicYear])
   @@map("co_attainments")
 }
 
@@ -294,12 +292,11 @@ model StudentMark {
   maxMarks     Int      // Maximum marks for this question (redundant but useful)
   submittedAt  DateTime @default(now())
   academicYear String?  // Academic year for filtering
-  semester     String?  // Semester for filtering
   
   question     Question @relation(fields: [questionId], references: [id])
   student      User     @relation(fields: [studentId], references: [id])
   
-  @@unique([questionId, studentId, academicYear, semester])
+  @@unique([questionId, studentId, academicYear])
   @@map("student_marks")
 }
 
