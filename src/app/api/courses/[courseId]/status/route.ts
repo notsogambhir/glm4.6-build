@@ -70,9 +70,111 @@ export async function POST(
 
     console.log(`Updated course ${course.code} status to ${status}`);
 
+    // If changing from FUTURE to ACTIVE, automatically enroll eligible students
+    let enrollmentData: {
+      totalEligible: number;
+      successfullyEnrolled: number;
+      students: {
+        id: string;
+        name: string;
+        studentId: string | null;
+        email: string | null;
+      }[];
+    } | null = null;
+    if (course.status === 'FUTURE' && status === 'ACTIVE') {
+      console.log(`Course ${course.code} changed from FUTURE to ACTIVE - processing automatic enrollment`);
+      
+      // Find all active students who should be enrolled in this course
+      // Students should be enrolled if they belong to the same batch and are active
+      const eligibleStudents = await db.user.findMany({
+        where: {
+          role: 'STUDENT',
+          isActive: true,
+          batchId: course.batchId,
+          // Only enroll students who are assigned to this batch's program
+          programId: course.batch.programId
+        },
+        select: {
+          id: true,
+          name: true,
+          studentId: true,
+          email: true
+        }
+      });
+
+      console.log(`Found ${eligibleStudents.length} eligible students for automatic enrollment`);
+
+      if (eligibleStudents.length > 0) {
+        // Create enrollments for all eligible students
+        const enrollments = await Promise.all(
+          eligibleStudents.map(async (student) => {
+            try {
+              // Check if student is already enrolled
+              const existingEnrollment = await db.enrollment.findUnique({
+                where: {
+                  courseId_studentId: {
+                    courseId: courseId,
+                    studentId: student.id
+                  }
+                }
+              });
+
+              if (!existingEnrollment) {
+                const enrollment = await db.enrollment.create({
+                  data: {
+                    courseId: courseId,
+                    studentId: student.id,
+                    isActive: true
+                  }
+                });
+                console.log(`Enrolled student: ${student.name} (${student.studentId})`);
+                return enrollment;
+              } else {
+                console.log(`Student ${student.name} already enrolled, skipping`);
+                return existingEnrollment;
+              }
+            } catch (error) {
+              console.error(`Error enrolling student ${student.name}:`, error);
+              return null;
+            }
+          })
+        );
+
+        const successfulEnrollments = enrollments.filter(e => e !== null);
+        console.log(`Successfully enrolled ${successfulEnrollments.length} out of ${eligibleStudents.length} eligible students`);
+
+        enrollmentData = {
+          totalEligible: eligibleStudents.length,
+          successfullyEnrolled: successfulEnrollments.length,
+          students: eligibleStudents.map(s => ({
+            id: s.id,
+            name: s.name,
+            studentId: s.studentId,
+            email: s.email
+          }))
+        };
+      }
+    }
+
+    // Get updated course with enrollment count
+    const courseWithEnrollments = await db.course.findUnique({
+      where: { id: courseId },
+      include: {
+        _count: {
+          select: {
+            enrollments: true
+          }
+        }
+      }
+    });
+
     return NextResponse.json({
-      message: `Course status updated to ${status}`,
-      course: updatedCourse
+      message: status === 'ACTIVE' && course.status === 'FUTURE' && enrollmentData
+        ? `Course status updated to ${status}. Automatic enrollment completed: ${enrollmentData.successfullyEnrolled} students enrolled.`
+        : `Course status updated to ${status}`,
+      course: courseWithEnrollments,
+      enrollmentData,
+      _count: courseWithEnrollments?._count
     });
 
   } catch (error) {

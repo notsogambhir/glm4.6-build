@@ -36,11 +36,11 @@ async function queryDatabase() {
         id: true,
         code: true,
         name: true,
-        semester: true,
         batchId: true,
         isActive: true,
         createdAt: true,
         description: true,
+        status: true,
       }
     });
     console.table(courses);
