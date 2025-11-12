@@ -99,38 +99,37 @@ export function LoginForm() {
   };
 
   const handleQuickLogin = async (email: string, password: string, collegeCode?: string) => {
-    // Find college ID if college code is provided
-    let collegeId = formData.collegeId;
-    if (collegeCode) {
-      const college = colleges.find(c => c.code === collegeCode);
-      if (college) {
-        collegeId = college.id;
-        setFormData(prev => ({ ...prev, collegeId: college.id }));
-      } else {
-        // If colleges haven't loaded yet, wait and try again
+    setLoading(true);
+    
+    try {
+      // Find college ID if college code is provided
+      let collegeId = formData.collegeId;
+      
+      if (collegeCode) {
+        // Wait for colleges to load if needed
         if (colleges.length === 0) {
           await fetchColleges();
-          const retryCollege = colleges.find(c => c.code === collegeCode);
-          if (retryCollege) {
-            collegeId = retryCollege.id;
-            setFormData(prev => ({ ...prev, collegeId: retryCollege.id }));
-          }
+        }
+        
+        const college = colleges.find(c => c.code === collegeCode);
+        if (college) {
+          collegeId = college.id;
+          setFormData(prev => ({ ...prev, collegeId: college.id }));
+        } else {
+          throw new Error(`College with code ${collegeCode} not found`);
         }
       }
-    }
 
-    setLoading(true);
-    try {
+      console.log('Attempting quick login:', { email, collegeId, collegeCode });
       await login(email, password, collegeId);
+      
       toast({
         title: "Success",
         description: `Logged in as ${email}! Redirecting...`,
       });
       
-      // Don't reload - let the auth state change naturally redirect the user
-      // The AppWrapper will automatically show the dashboard when user state changes
-      
     } catch (error) {
+      console.error('Quick login error:', error);
       toast({
         title: "Login Failed",
         description: error instanceof Error ? error.message : "Invalid credentials",
@@ -156,8 +155,8 @@ export function LoginForm() {
           </CardHeader>
           <CardContent>
             {/* Quick Login Buttons */}
-            <div className="mb-6 p-4 bg-gray-50 border border-gray-100 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Login</h4>
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-700 mb-3">Quick Login (Test Accounts)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
@@ -181,19 +180,19 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('cse@obeportal.com', 'password123', 'CUIET')}
+                  onClick={() => handleQuickLogin('cuiet@obeportal.com', 'password123', 'CUIET')}
                   className="text-xs"
                 >
-                  Dept (CSE)
+                  Dept (CUIET)
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('business@obeportal.com', 'password123', 'CBS')}
+                  onClick={() => handleQuickLogin('cbs@obeportal.com', 'password123', 'CBS')}
                   className="text-xs"
                 >
-                  Dept (Biz)
+                  Dept (CBS)
                 </Button>
                 <Button
                   type="button"
@@ -232,6 +231,7 @@ export function LoginForm() {
                   Teacher 2
                 </Button>
               </div>
+              <p className="text-xs text-blue-600 mt-2">Password: password123</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">

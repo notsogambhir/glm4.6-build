@@ -28,33 +28,26 @@ async function seed() {
       }),
     ]);
 
-    // Create departments
+    // Create departments - one department per college with same name as college
     const departments = await Promise.all([
       db.department.create({
         data: {
-          name: 'Computer Engineering',
-          code: 'CS',
+          name: 'CUIET',
+          code: 'CUIET',
           collegeId: colleges[0].id,
         },
       }),
       db.department.create({
         data: {
-          name: 'Electronics Engineering',
-          code: 'ECE',
-          collegeId: colleges[0].id,
-        },
-      }),
-      db.department.create({
-        data: {
-          name: 'Business Administration',
-          code: 'BA',
+          name: 'CBS',
+          code: 'CBS',
           collegeId: colleges[1].id,
         },
       }),
       db.department.create({
         data: {
-          name: 'Pharmacy',
-          code: 'PHARM',
+          name: 'CCP',
+          code: 'CCP',
           collegeId: colleges[2].id,
         },
       }),
@@ -68,7 +61,7 @@ async function seed() {
           name: 'BE ME',
           code: 'BEME',
           collegeId: colleges[0].id,
-          departmentId: departments[0].id,
+          departmentId: departments[0].id, // CUIET department
           duration: 4,
         },
       }),
@@ -77,7 +70,7 @@ async function seed() {
           name: 'BE ECE',
           code: 'BEECE',
           collegeId: colleges[0].id,
-          departmentId: departments[1].id,
+          departmentId: departments[0].id, // CUIET department
           duration: 4,
         },
       }),
@@ -87,7 +80,7 @@ async function seed() {
           name: 'BBA',
           code: 'BBA',
           collegeId: colleges[1].id,
-          departmentId: departments[2].id,
+          departmentId: departments[1].id, // CBS department
           duration: 3,
         },
       }),
@@ -96,7 +89,7 @@ async function seed() {
           name: 'MBA Global',
           code: 'MBA',
           collegeId: colleges[1].id,
-          departmentId: departments[2].id,
+          departmentId: departments[1].id, // CBS department
           duration: 2,
         },
       }),
@@ -106,7 +99,7 @@ async function seed() {
           name: 'B. Pharma',
           code: 'BPHARMA',
           collegeId: colleges[2].id,
-          departmentId: departments[3].id,
+          departmentId: departments[2].id, // CCP department
           duration: 3,
         },
       }),
@@ -115,7 +108,7 @@ async function seed() {
           name: 'M. Pharma',
           code: 'MPHARMA',
           collegeId: colleges[2].id,
-          departmentId: departments[3].id,
+          departmentId: departments[2].id, // CCP department
           duration: 2,
         },
       }),
@@ -245,22 +238,22 @@ async function seed() {
       // Department users
       db.user.create({
         data: {
-          email: 'cse@obeportal.com',
+          email: 'cuiet@obeportal.com',
           password: hashedPassword,
-          name: 'CSE Department Head',
+          name: 'CUIET Department Head',
           role: 'DEPARTMENT',
           collegeId: colleges[0].id,
-          departmentId: departments[0].id,
+          departmentId: departments[0].id, // CUIET department
         },
       }),
       db.user.create({
         data: {
-          email: 'business@obeportal.com',
+          email: 'cbs@obeportal.com',
           password: hashedPassword,
-          name: 'Business Department Head',
+          name: 'CBS Department Head',
           role: 'DEPARTMENT',
           collegeId: colleges[1].id,
-          departmentId: departments[2].id,
+          departmentId: departments[1].id, // CBS department
         },
       }),
       // Program Coordinators
@@ -311,8 +304,8 @@ async function seed() {
     console.log('Login credentials:');
     console.log('Admin: admin@obeportal.com / password123');
     console.log('University: university@obeportal.com / password123');
-    console.log('Department (CSE): cse@obeportal.com / password123');
-    console.log('Department (Business): business@obeportal.com / password123');
+    console.log('Department (CUIET): cuiet@obeportal.com / password123');
+    console.log('Department (CBS): cbs@obeportal.com / password123');
     console.log('PC (BE ME): pc.beme@obeportal.com / password123');
     console.log('PC (BBA): pc.bba@obeportal.com / password123');
     console.log('Teacher: teacher1@obeportal.com / password123');

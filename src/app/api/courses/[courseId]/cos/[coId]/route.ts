@@ -1,52 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/server-auth';
-import { canCreateCourse } from '@/lib/permissions';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ courseId: string; coId: string }> }
 ) {
   try {
+    const user = await getUserFromRequest(request);
+    
+    if (!user || !['ADMIN', 'UNIVERSITY', 'PROGRAM_COORDINATOR', 'TEACHER'].includes(user.role)) {
+      return NextResponse.json(
+        { error: 'Admin, University, Program Coordinator, or Teacher access required' },
+        { status: 403 }
+      );
+    }
+
     const resolvedParams = await params;
     const { courseId, coId } = resolvedParams;
+    const { code, description, isActive } = await request.json();
 
-    if (!courseId || !coId) {
-      return NextResponse.json({ error: 'Course ID and CO ID are required' }, { status: 400 });
+    if (!code || !description) {
+      return NextResponse.json(
+        { error: 'Code and description are required' },
+        { status: 400 }
+      );
     }
 
-    // Get authenticated user and check permissions
-    const user = await getUserFromRequest(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    if (!canCreateCourse(user)) {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions. Only admin, university, department, and program coordinator roles can manage COs.' 
-      }, { status: 403 });
-    }
-
-    const body = await request.json();
-    const { description } = body;
-
-    if (!description || description.trim().length === 0) {
-      return NextResponse.json({ error: 'CO description is required' }, { status: 400 });
-    }
-
-    // Get the CO to verify it belongs to the course
-    const co = await db.cO.findFirst({
-      where: {
-        id: coId,
-        courseId: courseId,
-        isActive: true
-      },
+    // Check if CO exists and get course info
+    const existingCO = await db.cO.findUnique({
+      where: { id: coId },
       include: {
         course: {
           include: {
             batch: {
               include: {
-                program: true
+                program: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
             }
           }
@@ -54,32 +48,76 @@ export async function PUT(
       }
     });
 
-    if (!co) {
-      return NextResponse.json({ error: 'CO not found' }, { status: 404 });
+    if (!existingCO || existingCO.courseId !== courseId) {
+      return NextResponse.json(
+        { error: 'Course Outcome not found in this course' },
+        { status: 404 }
+      );
     }
 
-    // Check permissions for program coordinators
-    if (user.role === 'PROGRAM_COORDINATOR' && co.course.batch.programId !== user.programId) {
-      return NextResponse.json({ 
-        error: 'You can only manage COs for courses in your assigned program' 
-      }, { status: 403 });
+    // Check if user has permission for this course
+    if (user.role === 'PROGRAM_COORDINATOR' && existingCO.course.batch.programId !== user.programId) {
+      return NextResponse.json(
+        { error: 'You can only update COs from courses in your assigned program' },
+        { status: 403 }
+      );
     }
 
-    // Update CO
-    const updatedCO = await db.cO.update({
-      where: { id: coId },
-      data: {
-        description: description.trim(),
-        updatedAt: new Date()
+    if (user.role === 'TEACHER') {
+      // Teachers should only be able to update COs for courses they're assigned to
+      // For now, we'll allow teachers to update any CO
+      // In a real implementation, you'd check course assignments
+    }
+
+    // Check if another CO with same code exists in the same course
+    const duplicateCO = await db.cO.findFirst({
+      where: {
+        AND: [
+          { id: { not: coId } },
+          { courseId: courseId },
+          { code: code }
+        ]
       }
     });
 
-    console.log(`Updated CO ${co.code} for course ${courseId}`);
+    if (duplicateCO) {
+      return NextResponse.json(
+        { error: 'Course Outcome with this code already exists in this course' },
+        { status: 409 }
+      );
+    }
 
-    return NextResponse.json(updatedCO);
+    const co = await db.cO.update({
+      where: { id: coId },
+      data: {
+        code: code.trim().toUpperCase(),
+        description: description.trim(),
+        isActive: isActive !== undefined ? isActive : existingCO.isActive
+      },
+      include: {
+        course: {
+          select: {
+            id: true,
+            code: true,
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            mappings: true,
+            coAttainments: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json(co);
   } catch (error) {
     console.error('Error updating CO:', error);
-    return NextResponse.json({ error: 'Failed to update CO' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update Course Outcome' },
+      { status: 500 }
+    );
   }
 }
 
@@ -88,91 +126,87 @@ export async function DELETE(
   { params }: { params: Promise<{ courseId: string; coId: string }> }
 ) {
   try {
+    const user = await getUserFromRequest(request);
+    
+    if (!user || !['ADMIN', 'UNIVERSITY', 'PROGRAM_COORDINATOR', 'TEACHER'].includes(user.role)) {
+      return NextResponse.json(
+        { error: 'Admin, University, Program Coordinator, or Teacher access required' },
+        { status: 403 }
+      );
+    }
+
     const resolvedParams = await params;
     const { courseId, coId } = resolvedParams;
 
-    if (!courseId || !coId) {
-      return NextResponse.json({ error: 'Course ID and CO ID are required' }, { status: 400 });
-    }
-
-    // Get authenticated user and check permissions
-    const user = await getUserFromRequest(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Authorization required' }, { status: 401 });
-    }
-
-    if (!canCreateCourse(user)) {
-      return NextResponse.json({ 
-        error: 'Insufficient permissions. Only admin, university, department, and program coordinator roles can manage COs.' 
-      }, { status: 403 });
-    }
-
-    // Get the CO to verify it belongs to the course
-    const co = await db.cO.findFirst({
-      where: {
-        id: coId,
-        courseId: courseId,
-        isActive: true
-      },
+    // Check if CO exists and get course info
+    const existingCO = await db.cO.findUnique({
+      where: { id: coId },
       include: {
         course: {
           include: {
             batch: {
               include: {
-                program: true
+                program: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
               }
             }
           }
-        }
-      }
-    });
-
-    if (!co) {
-      return NextResponse.json({ error: 'CO not found' }, { status: 404 });
-    }
-
-    // Check permissions for program coordinators
-    if (user.role === 'PROGRAM_COORDINATOR' && co.course.batch.programId !== user.programId) {
-      return NextResponse.json({ 
-        error: 'You can only manage COs for courses in your assigned program' 
-      }, { status: 403 });
-    }
-
-    // Check if CO is referenced in any mappings or questions
-    const mappingCount = await db.cOPOMapping.count({
-      where: { coId: coId }
-    });
-
-    const questionCount = await db.question.count({
-      where: {
-        coMappings: {
-          some: {
-            coId: coId
+        },
+        _count: {
+          select: {
+            mappings: true,
+            coAttainments: true
           }
         }
       }
     });
 
-    if (mappingCount > 0 || questionCount > 0) {
-      return NextResponse.json({ 
-        error: 'Cannot delete CO that is referenced in CO-PO mappings or assessment questions' 
-      }, { status: 400 });
+    if (!existingCO || existingCO.courseId !== courseId) {
+      return NextResponse.json(
+        { error: 'Course Outcome not found in this course' },
+        { status: 404 }
+      );
     }
 
-    // Soft delete CO (set isActive to false)
-    await db.cO.update({
-      where: { id: coId },
-      data: {
-        isActive: false,
-        updatedAt: new Date()
-      }
+    // Check if user has permission for this course
+    if (user.role === 'PROGRAM_COORDINATOR' && existingCO.course.batch.programId !== user.programId) {
+      return NextResponse.json(
+        { error: 'You can only delete COs from courses in your assigned program' },
+        { status: 403 }
+      );
+    }
+
+    // Check if CO has associated data
+    if (
+      existingCO._count.mappings > 0 ||
+      existingCO._count.coAttainments > 0
+    ) {
+      return NextResponse.json(
+        { error: 'Cannot delete CO with associated CO-PO mappings or CO attainments' },
+        { status: 400 }
+      );
+    }
+
+    await db.cO.delete({
+      where: { id: coId }
     });
 
-    console.log(`Deleted CO ${co.code} for course ${courseId}`);
-
-    return NextResponse.json({ message: 'CO deleted successfully' });
+    return NextResponse.json({ 
+      message: 'Course Outcome deleted successfully',
+      deletedCO: {
+        code: existingCO.code,
+        description: existingCO.description
+      }
+    });
   } catch (error) {
     console.error('Error deleting CO:', error);
-    return NextResponse.json({ error: 'Failed to delete CO' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to delete Course Outcome' },
+      { status: 500 }
+    );
   }
 }

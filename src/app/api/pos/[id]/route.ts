@@ -9,29 +9,16 @@ export async function PUT(
   try {
     const user = await getUserFromRequest(request);
     
-    if (!user) {
+    if (!user || !['ADMIN', 'UNIVERSITY', 'PROGRAM_COORDINATOR'].includes(user.role)) {
       return NextResponse.json(
-        { error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    // Only Program Coordinators, Admins, and University can update POs
-    if (!['PROGRAM_COORDINATOR', 'ADMIN', 'UNIVERSITY'].includes(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions. Only Program Coordinators and above can update POs.' },
+        { error: 'Admin, University, or Program Coordinator access required' },
         { status: 403 }
       );
     }
 
-    const body = await request.json();
-    const { code, description } = body;
     const resolvedParams = await params;
-    const poId = resolvedParams.id;
-
-    if (!poId) {
-      return NextResponse.json({ error: 'PO ID is required' }, { status: 400 });
-    }
+    const { id } = resolvedParams;
+    const { code, description, isActive } = await request.json();
 
     if (!code || !description) {
       return NextResponse.json(
@@ -42,58 +29,80 @@ export async function PUT(
 
     // Check if PO exists
     const existingPO = await db.pO.findUnique({
-      where: { id: poId },
-      include: { program: true }
-    });
-
-    if (!existingPO) {
-      return NextResponse.json({ error: 'PO not found' }, { status: 404 });
-    }
-
-    // For Program Coordinators, verify they have access to this program
-    if (user.role === 'PROGRAM_COORDINATOR' && user.programId !== existingPO.programId) {
-      return NextResponse.json(
-        { error: 'You can only update POs for your assigned program' },
-        { status: 403 }
-      );
-    }
-
-    // Check if code conflicts with another PO in the same program
-    const conflictingPO = await db.pO.findFirst({
-      where: {
-        programId: existingPO.programId,
-        code: code.toUpperCase(),
-        id: { not: poId }
-      }
-    });
-
-    if (conflictingPO) {
-      return NextResponse.json(
-        { error: 'PO with this code already exists in this program' },
-        { status: 409 }
-      );
-    }
-
-    const updatedPO = await db.pO.update({
-      where: { id: poId },
-      data: {
-        code: code.toUpperCase(),
-        description: description.trim()
-      },
+      where: { id },
       include: {
         program: {
           select: {
-            name: true,
-            code: true
+            id: true,
+            name: true
           }
         }
       }
     });
 
-    return NextResponse.json(updatedPO);
+    if (!existingPO) {
+      return NextResponse.json(
+        { error: 'Program Outcome not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if user has permission for this program
+    if (user.role === 'PROGRAM_COORDINATOR' && existingPO.programId !== user.programId) {
+      return NextResponse.json(
+        { error: 'You can only update POs from your assigned program' },
+        { status: 403 }
+      );
+    }
+
+    // Check if another PO with same code exists in the same program
+    const duplicatePO = await db.pO.findFirst({
+      where: {
+        AND: [
+          { id: { not: id } },
+          { programId: existingPO.programId },
+          { code: code }
+        ]
+      }
+    });
+
+    if (duplicatePO) {
+      return NextResponse.json(
+        { error: 'Program Outcome with this code already exists in this program' },
+        { status: 409 }
+      );
+    }
+
+    const po = await db.pO.update({
+      where: { id },
+      data: {
+        code: code.trim().toUpperCase(),
+        description: description.trim(),
+        isActive: isActive !== undefined ? isActive : existingPO.isActive
+      },
+      include: {
+        program: {
+          select: {
+            id: true,
+            name: true,
+            code: true
+          }
+        },
+        _count: {
+          select: {
+            mappings: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json(po);
   } catch (error) {
     console.error('Error updating PO:', error);
-    return NextResponse.json({ error: 'Failed to update PO' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to update Program Outcome' },
+      { status: 500 }
+    );
   }
 }
 
@@ -104,67 +113,73 @@ export async function DELETE(
   try {
     const user = await getUserFromRequest(request);
     
-    if (!user) {
+    if (!user || !['ADMIN', 'UNIVERSITY', 'PROGRAM_COORDINATOR'].includes(user.role)) {
       return NextResponse.json(
-        { error: 'Authorization required' },
-        { status: 401 }
-      );
-    }
-
-    // Only Program Coordinators, Admins, and University can delete POs
-    if (!['PROGRAM_COORDINATOR', 'ADMIN', 'UNIVERSITY'].includes(user.role)) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions. Only Program Coordinators and above can delete POs.' },
+        { error: 'Admin, University, or Program Coordinator access required' },
         { status: 403 }
       );
     }
 
     const resolvedParams = await params;
-    const poId = resolvedParams.id;
-
-    if (!poId) {
-      return NextResponse.json({ error: 'PO ID is required' }, { status: 400 });
-    }
+    const { id } = resolvedParams;
 
     // Check if PO exists
     const existingPO = await db.pO.findUnique({
-      where: { id: poId },
-      include: { program: true }
+      where: { id },
+      include: {
+        program: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            mappings: true
+          }
+        }
+      }
     });
 
     if (!existingPO) {
-      return NextResponse.json({ error: 'PO not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Program Outcome not found' },
+        { status: 404 }
+      );
     }
 
-    // For Program Coordinators, verify they have access to this program
-    if (user.role === 'PROGRAM_COORDINATOR' && user.programId !== existingPO.programId) {
+    // Check if user has permission for this program
+    if (user.role === 'PROGRAM_COORDINATOR' && existingPO.programId !== user.programId) {
       return NextResponse.json(
-        { error: 'You can only delete POs for your assigned program' },
+        { error: 'You can only delete POs from your assigned program' },
         { status: 403 }
       );
     }
 
-    // Check if PO is referenced in any CO-PO mappings
-    const mappingCount = await db.cOPOMapping.count({
-      where: { poId }
-    });
-
-    if (mappingCount > 0) {
+    // Check if PO has associated CO-PO mappings
+    if (existingPO._count.mappings > 0) {
       return NextResponse.json(
-        { error: 'Cannot delete PO that is referenced in CO-PO mappings' },
+        { error: 'Cannot delete PO with associated CO-PO mappings' },
         { status: 400 }
       );
     }
 
-    // Soft delete by setting isActive to false
-    await db.pO.update({
-      where: { id: poId },
-      data: { isActive: false }
+    await db.pO.delete({
+      where: { id }
     });
 
-    return NextResponse.json({ message: 'PO deleted successfully' });
+    return NextResponse.json({ 
+      message: 'Program Outcome deleted successfully',
+      deletedPO: {
+        code: existingPO.code,
+        description: existingPO.description
+      }
+    });
   } catch (error) {
     console.error('Error deleting PO:', error);
-    return NextResponse.json({ error: 'Failed to delete PO' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to delete Program Outcome' },
+      { status: 500 }
+    );
   }
 }
