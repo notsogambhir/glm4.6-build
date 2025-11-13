@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // If user is department role, only show their college's programs
     let whereClause = collegeId ? { collegeId } : {};
-    if (user.role === 'DEPARTMENT') {
+    if (user.role === 'DEPARTMENT' && user.collegeId) {
       whereClause = { collegeId: user.collegeId };
     }
 

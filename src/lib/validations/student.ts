@@ -3,9 +3,11 @@ import { z } from 'zod';
 export const studentSchema = z.object({
   studentId: z.string().min(1, 'Student ID is required'),
   name: z.string().min(1, 'Student name is required'),
+  email: z.string().email('Invalid email format').optional(),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  programId: z.string().optional(),
-  batchId: z.string().optional(),
+  collegeId: z.string().min(1, 'College is required'),
+  programId: z.string().min(1, 'Program is required'),
+  batchId: z.string().min(1, 'Batch is required'),
 });
 
 export const updateStudentSchema = z.object({

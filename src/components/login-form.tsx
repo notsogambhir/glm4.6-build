@@ -61,10 +61,27 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.email || !formData.password || !formData.collegeId) {
+    // Validate form fields
+    const validationErrors: string[] = [];
+    if (!formData.email) validationErrors.push("Email is required");
+    if (!formData.password) validationErrors.push("Password is required");
+    if (!formData.collegeId) validationErrors.push("College selection is required");
+    
+    if (validationErrors.length > 0) {
       toast({
-        title: "Error",
-        description: "Please fill in all fields",
+        title: "Validation Error",
+        description: validationErrors.join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
@@ -80,17 +97,42 @@ export function LoginForm() {
       }
       
       toast({
-        title: "Success",
-        description: "Login successful! Redirecting...",
+        title: "Login Successful",
+        description: "Welcome back! Redirecting to your dashboard...",
       });
       
       // Don't reload - let the auth state change naturally redirect the user
       // The AppWrapper will automatically show the dashboard when user state changes
       
     } catch (error) {
+      console.error('Login error:', error);
+      
+      let errorMessage = "An unexpected error occurred";
+      let errorTitle = "Login Failed";
+      
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        
+        if (message.includes('invalid credentials') || message.includes('college access denied')) {
+          errorTitle = "Authentication Failed";
+          errorMessage = "Invalid email, password, or college access. Please check your credentials and try again.";
+        } else if (message.includes('email and password are required')) {
+          errorTitle = "Missing Information";
+          errorMessage = "Please enter both email and password.";
+        } else if (message.includes('internal server error')) {
+          errorTitle = "Server Error";
+          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+        } else if (message.includes('network') || message.includes('fetch')) {
+          errorTitle = "Network Error";
+          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -124,15 +166,39 @@ export function LoginForm() {
       await login(email, password, collegeId);
       
       toast({
-        title: "Success",
-        description: `Logged in as ${email}! Redirecting...`,
+        title: "Login Successful",
+        description: `Welcome back! Redirecting to your dashboard...`,
       });
       
     } catch (error) {
       console.error('Quick login error:', error);
+      
+      let errorMessage = "An unexpected error occurred during quick login";
+      let errorTitle = "Quick Login Failed";
+      
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        
+        if (message.includes('college with code') || message.includes('not found')) {
+          errorTitle = "College Not Found";
+          errorMessage = "The specified college could not be found. Please try selecting a college manually.";
+        } else if (message.includes('invalid credentials') || message.includes('college access denied')) {
+          errorTitle = "Authentication Failed";
+          errorMessage = "Invalid credentials for this account. Please check the quick login credentials.";
+        } else if (message.includes('internal server error')) {
+          errorTitle = "Server Error";
+          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+        } else if (message.includes('network') || message.includes('fetch')) {
+          errorTitle = "Network Error";
+          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

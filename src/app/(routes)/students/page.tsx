@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { StudentManagementDepartment } from '@/components/student-management-department';
 import { StudentManagementProgramCoordinator } from '@/components/student-management-program-coordinator';
 import { StudentManagementTeacher } from '@/components/student-management-teacher';
+import { StudentManagementAdmin } from '@/components/student-management-admin';
 
 export default function StudentsPage() {
   const { user } = useAuth();
@@ -16,19 +17,10 @@ export default function StudentsPage() {
   switch (user.role) {
     case 'ADMIN':
     case 'UNIVERSITY':
-      // Admin and University users can view all students across all colleges/departments
+      // Admin and University users can view and manage all students across all colleges/departments
       return (
         <div className="p-6">
-          <div className="text-center py-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Student Management - {user.role.replace('_', ' ')}</h3>
-            <p className="text-gray-600">Comprehensive student view and management capabilities.</p>
-            <div className="mt-4 text-sm text-gray-500">
-              <p>• View all students across institutions</p>
-              <p>• Academic performance tracking</p>
-              <p>• Enrollment statistics</p>
-              <p>• OBE compliance monitoring</p>
-            </div>
-          </div>
+          <StudentManagementAdmin user={user} />
         </div>
       );
     case 'DEPARTMENT':

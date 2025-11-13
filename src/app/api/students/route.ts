@@ -169,8 +169,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
     }
 
-    // Only department and program coordinator roles can create students
-    if (!['DEPARTMENT', 'PROGRAM_COORDINATOR'].includes(user.role)) {
+    // Only department, program coordinator, and admin roles can create students
+    if (!['DEPARTMENT', 'PROGRAM_COORDINATOR', 'ADMIN', 'UNIVERSITY'].includes(user.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
@@ -189,7 +189,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set program and batch based on user context if not provided
+    // Set college, program, and batch based on user context if not provided
+    if (!validatedData.collegeId && user.collegeId) {
+      validatedData.collegeId = user.collegeId;
+    }
     if (!validatedData.programId && user.programId) {
       validatedData.programId = user.programId;
     }
@@ -197,7 +200,14 @@ export async function POST(request: NextRequest) {
       validatedData.batchId = user.batchId;
     }
 
-    // Validate that programId and batchId are provided and valid
+    // Validate that collegeId, programId, and batchId are provided and valid
+    if (!validatedData.collegeId || validatedData.collegeId.trim() === '') {
+      return NextResponse.json(
+        { error: 'College ID is required. Please select a college.' },
+        { status: 400 }
+      );
+    }
+
     if (!validatedData.programId || validatedData.programId.trim() === '') {
       return NextResponse.json(
         { error: 'Program ID is required. Please ensure you are assigned to a program.' },

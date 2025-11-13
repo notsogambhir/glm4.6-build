@@ -107,9 +107,14 @@ export default function FacultyManagement() {
           filteredUsers = data.filter((u: User) => 
             u.programId === user.programId && u.role !== 'STUDENT'
           );
+        } else if (user?.role === 'ADMIN' || user?.role === 'UNIVERSITY') {
+          // Admin and University users can see all faculty (non-students) across the system
+          filteredUsers = data.filter((u: User) => u.role !== 'STUDENT');
         } else {
-          // Admin and University users see program coordinators only
-          filteredUsers = data.filter((u: User) => u.role === 'PROGRAM_COORDINATOR');
+          // Program coordinators see faculty in their program only
+          filteredUsers = data.filter((u: User) => 
+            u.programId === user.programId && u.role !== 'STUDENT'
+          );
         }
         setUsers(filteredUsers);
       }
@@ -215,18 +220,20 @@ export default function FacultyManagement() {
           <h1 className="text-3xl font-bold text-gray-900">
             {user?.role === 'DEPARTMENT' ? 'Department Faculty' : 
              user?.role === 'PROGRAM_COORDINATOR' ? 'Program Faculty' : 
+             user?.role === 'ADMIN' || user?.role === 'UNIVERSITY' ? 'Faculty Management' :
              'Faculty Management'}
           </h1>
           <p className="text-gray-600 mt-2">
             {user?.role === 'DEPARTMENT' ? 'Manage faculty members in your department' :
              user?.role === 'PROGRAM_COORDINATOR' ? 'Manage faculty members in your program' :
-             'Manage program coordinators and their program assignments'}
+             user?.role === 'ADMIN' || user?.role === 'UNIVERSITY' ? 'Manage all faculty members across the institution' :
+             'Manage faculty members'}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Users className="h-6 w-6 text-red-600" />
           <span className="text-lg font-semibold">
-            {users.length} {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' ? 'Faculty Members' : 'Program Coordinators'}
+            {users.length} {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' || (user?.role === 'ADMIN' || user?.role === 'UNIVERSITY') ? 'Faculty Members' : 'Program Coordinators'}
           </span>
         </div>
       </div>
@@ -292,11 +299,13 @@ export default function FacultyManagement() {
           <CardTitle>
             {user?.role === 'DEPARTMENT' ? 'Department Faculty Members' :
              user?.role === 'PROGRAM_COORDINATOR' ? 'Program Faculty Members' :
+             user?.role === 'ADMIN' || user?.role === 'UNIVERSITY' ? 'All Faculty Members' :
              'Program Coordinators'}
           </CardTitle>
           <CardDescription>
             {user?.role === 'DEPARTMENT' ? 'View and manage faculty members in your department' :
              user?.role === 'PROGRAM_COORDINATOR' ? 'View and manage faculty members in your program' :
+             user?.role === 'ADMIN' || user?.role === 'UNIVERSITY' ? 'View and manage all faculty members across the institution' :
              'Manage program coordinators and assign them to specific programs'}
           </CardDescription>
         </CardHeader>
@@ -305,7 +314,7 @@ export default function FacultyManagement() {
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">
-                {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' ? 
+                {user?.role === 'DEPARTMENT' || user?.role === 'PROGRAM_COORDINATOR' || (user?.role === 'ADMIN' || user?.role === 'UNIVERSITY') ? 
                  'No faculty members found' : 'No program coordinators found'}
               </p>
             </div>
@@ -354,7 +363,7 @@ export default function FacultyManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {user?.role === 'ADMIN' && userItem.role === 'PROGRAM_COORDINATOR' && (
+                    {(user?.role === 'ADMIN' || user?.role === 'UNIVERSITY') && (userItem.role === 'PROGRAM_COORDINATOR' || userItem.role === 'TEACHER' || userItem.role === 'DEPARTMENT') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -377,7 +386,9 @@ export default function FacultyManagement() {
       <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Assign Programs to Coordinator</DialogTitle>
+            <DialogTitle>
+              {user?.role === 'ADMIN' || user?.role === 'UNIVERSITY' ? 'Assign Programs to Faculty Member' : 'Assign Programs to Coordinator'}
+            </DialogTitle>
             <DialogDescription>
               Select programs to assign to <strong>{selectedUser?.name}</strong>
             </DialogDescription>

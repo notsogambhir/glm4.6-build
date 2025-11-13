@@ -118,29 +118,13 @@ export function Sidebar({ user, activeView, onViewChange, onLogout, onBackToSele
       icon: Users,
       roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR', 'TEACHER'],
     },
-    // Teachers - Program Coordinator, Department, University, Admin
-    {
-      id: 'teachers',
-      label: 'Teachers',
-      href: '/teachers',
-      icon: UserCheck,
-      roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'],
-    },
-    // Faculty Management - Department only
+    // Faculty Management - Department, Program Coordinator, and Admin
     {
       id: 'faculty-management',
       label: 'Faculty Management',
       href: '/faculty-management',
       icon: UserCheck,
-      roles: ['DEPARTMENT'],
-    },
-    // Student Management - Department only
-    {
-      id: 'student-management',
-      label: 'Student Management',
-      href: '/student-management',
-      icon: Users,
-      roles: ['DEPARTMENT'],
+      roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'],
     },
     // Program Outcomes - Program Coordinator, Department, University, Admin
     {
@@ -148,22 +132,6 @@ export function Sidebar({ user, activeView, onViewChange, onLogout, onBackToSele
       label: 'Program Outcomes',
       href: '/program-outcomes',
       icon: Target,
-      roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'],
-    },
-    // Reports - available to all roles except Teachers
-    {
-      id: 'reports',
-      label: 'Reports',
-      href: '/reports',
-      icon: FileText,
-      roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR', 'TEACHER'],
-    },
-    // OBE Compliance - Program Coordinator, Department, University, Admin
-    {
-      id: 'obe-compliance',
-      label: 'OBE Compliance',
-      href: '/obe-compliance',
-      icon: Shield,
       roles: ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'],
     },
     // User Management - Admin only

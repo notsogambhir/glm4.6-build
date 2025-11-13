@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, AuthUser } from '@/types/user';
 
+// Email validation regex
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string, collegeId?: string) => Promise<void>;
@@ -92,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const verifyWithServer = async () => {
     // Add a timeout to the fetch request
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
       const response = await fetch(`/api/auth/me`, {
@@ -110,8 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('Server auth check successful, user:', data.user);
       } else {
         // Silently handle auth failures - don't log 401 errors as they're expected when not logged in
-        if (response.status !== 401) {
-          console.log('Server auth check failed:', response.status);
+        if (response.status === 401) {
+          console.log('User not authenticated (401)');
+        } else if (response.status === 403) {
+          console.log('User access forbidden (403)');
+        } else {
+          console.log('Server auth check failed:', response.status, response.statusText);
         }
         setUser(null);
         localStorage.removeItem('obe-user');
@@ -121,16 +128,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const error = fetchError as Error;
       if (error.name === 'AbortError') {
         console.log('Server auth check request timed out');
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        console.log('Network error during auth check - this is expected in some environments');
       } else {
-        // Suppress network errors in development/preview environments
-        if (!error.message.includes('Failed to fetch') && !error.message.includes('NetworkError')) {
-          console.log('Server auth check request failed:', error.message);
-        }
+        console.log('Server auth check request failed:', error.message);
       }
       // Don't set user to null on network errors if we have stored data
       const storedUser = localStorage.getItem('obe-user');
       if (!storedUser) {
         setUser(null);
+      } else {
+        console.log('Using stored user data due to network issues');
       }
     } finally {
       setLoading(false);
@@ -142,10 +150,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('Email:', email);
     console.log('College ID:', collegeId);
     
+    // Input validation
+    if (!email || !password) {
+      const error = new Error('Email and password are required');
+      console.error('Login validation failed:', error.message);
+      throw error;
+    }
+
+    if (!emailRegex.test(email)) {
+      const error = new Error('Please enter a valid email address');
+      console.error('Login validation failed:', error.message);
+      throw error;
+    }
+    
     // Use relative URL to work in both development and production
     console.log('Request URL: /api/auth/login');
     
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(`/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -153,15 +177,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
         credentials: 'include',
         body: JSON.stringify({ email, password, collegeId }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
       console.log('Response status:', response.status);
       console.log('Response ok:', response.ok);
 
       if (!response.ok) {
-        const error = await response.json();
-        console.error('Login error response:', error);
-        throw new Error(error.error || 'Login failed');
+        let errorMessage = 'Login failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error('Login error response:', errorData);
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          errorMessage = `Server returned ${response.status}: ${response.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -192,23 +226,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
     } catch (error) {
       console.error('Login failed:', error);
-      throw error;
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Login request timed out. Please check your connection and try again.');
+        }
+        // Re-throw the original error with more context if needed
+        throw error;
+      }
+      
+      throw new Error('An unexpected error occurred during login');
     }
   };
 
   const logout = async () => {
     try {
       // Use relative URL to work in both development and production
-      await fetch(`/api/auth/logout`, { 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`/api/auth/logout`, { 
         method: 'POST',
         credentials: 'include',
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn('Logout request failed:', response.status, response.statusText);
+      } else {
+        console.log('Logout successful');
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      const err = error as Error;
+      if (err.name === 'AbortError') {
+        console.warn('Logout request timed out');
+      } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        console.warn('Network error during logout - proceeding with local logout');
+      } else {
+        console.warn('Logout error:', err.message);
+      }
+      // Even if the server logout fails, we should still clear local state
     } finally {
       setUser(null);
       // Clear localStorage on logout
       localStorage.removeItem('obe-user');
+      localStorage.removeItem('obe-selected-batch');
     }
   };
 

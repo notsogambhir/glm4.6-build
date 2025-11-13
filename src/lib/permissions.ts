@@ -50,8 +50,10 @@ export function hasPermission(user: AuthUser | null, permission: Permission): bo
     // Faculty permissions
     case Permission.CREATE_FACULTY:
     case Permission.MANAGE_FACULTY:
-    case Permission.VIEW_FACULTY:
       return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(role);
+    
+    case Permission.VIEW_FACULTY:
+      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'].includes(role);
     
     // Admin permissions
     case Permission.MANAGE_COLLEGES:
