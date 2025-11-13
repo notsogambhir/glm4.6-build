@@ -7,6 +7,9 @@ import { SidebarProvider } from '@/contexts/sidebar-context';
 import { Suspense } from 'react';
 import { PageLoading } from '@/components/ui/page-loading';
 import { ErrorSuppressor } from '@/components/error-suppressor';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { NotificationProvider, NotificationContainer } from '@/lib/notification-system';
+import { errorTracker } from '@/lib/client-error-tracker';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -47,19 +50,28 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Initialize error tracking on app load
+  if (typeof window !== 'undefined') {
+    // Error tracking is initialized automatically via import
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <Suspense fallback={<PageLoading message="Initializing application..." />}>
-          <ErrorSuppressor />
-          <AuthProvider>
-            <SidebarProvider>
-              {children}
-              <Toaster />
-            </SidebarProvider>
-          </AuthProvider>
+          <ErrorBoundary context="root_layout" showDetails={process.env.NODE_ENV === 'development'}>
+            <NotificationProvider>
+              <AuthProvider>
+                <SidebarProvider>
+                  {children}
+                  <Toaster />
+                  <NotificationContainer />
+                </SidebarProvider>
+              </AuthProvider>
+            </NotificationProvider>
+          </ErrorBoundary>
         </Suspense>
       </body>
     </html>

@@ -105,9 +105,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
-  const [selectedProgramId, setSelectedProgramId] = useState<string>('');
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
+  const [selectedProgramId, setSelectedProgramId] = useState<string>('all');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('all');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [formData, setFormData] = useState<StudentFormData>({
@@ -167,9 +167,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
       setLoading(true);
       const params = new URLSearchParams();
       
-      if (selectedCollegeId) params.append('collegeId', selectedCollegeId);
-      if (selectedProgramId) params.append('programId', selectedProgramId);
-      if (selectedBatchId) params.append('batchId', selectedBatchId);
+      if (selectedCollegeId && selectedCollegeId !== 'all') params.append('collegeId', selectedCollegeId);
+      if (selectedProgramId && selectedProgramId !== 'all') params.append('programId', selectedProgramId);
+      if (selectedBatchId && selectedBatchId !== 'all') params.append('batchId', selectedBatchId);
 
       const response = await fetch(`/api/students?${params}`);
       if (response.ok) {
@@ -191,14 +191,22 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   }, []);
 
   useEffect(() => {
-    fetchPrograms(selectedCollegeId);
-    setSelectedProgramId('');
-    setSelectedBatchId('');
+    if (selectedCollegeId && selectedCollegeId !== 'all') {
+      fetchPrograms(selectedCollegeId);
+    } else {
+      setPrograms([]);
+    }
+    setSelectedProgramId('all');
+    setSelectedBatchId('all');
   }, [selectedCollegeId]);
 
   useEffect(() => {
-    fetchBatches(selectedProgramId);
-    setSelectedBatchId('');
+    if (selectedProgramId && selectedProgramId !== 'all') {
+      fetchBatches(selectedProgramId);
+    } else {
+      setBatches([]);
+    }
+    setSelectedBatchId('all');
   }, [selectedProgramId]);
 
   useEffect(() => {
@@ -208,11 +216,11 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   // Handle college selection change
   const handleCollegeChange = (collegeId: string) => {
     setSelectedCollegeId(collegeId);
-    setSelectedProgramId('');
-    setSelectedBatchId('');
+    setSelectedProgramId('all');
+    setSelectedBatchId('all');
     setFormData(prev => ({
       ...prev,
-      collegeId,
+      collegeId: collegeId === 'all' ? '' : collegeId,
       programId: '',
       batchId: '',
     }));
@@ -221,10 +229,10 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   // Handle program selection change
   const handleProgramChange = (programId: string) => {
     setSelectedProgramId(programId);
-    setSelectedBatchId('');
+    setSelectedBatchId('all');
     setFormData(prev => ({
       ...prev,
-      programId,
+      programId: programId === 'all' ? '' : programId,
       batchId: '',
     }));
   };
@@ -234,12 +242,14 @@ export function StudentManagementAdmin({ user }: { user: User }) {
     setSelectedBatchId(batchId);
     setFormData(prev => ({
       ...prev,
-      batchId,
+      batchId: batchId === 'all' ? '' : batchId,
     }));
   };
 
   // Check if user can upload students
-  const canUploadStudents = selectedCollegeId && selectedProgramId && selectedBatchId;
+  const canUploadStudents = selectedCollegeId && selectedCollegeId !== 'all' && 
+                          selectedProgramId && selectedProgramId !== 'all' && 
+                          selectedBatchId && selectedBatchId !== 'all';
 
   // Filter students based on search term
   const filteredStudents = students.filter(student =>
@@ -389,9 +399,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
       name: '',
       email: '',
       password: '',
-      collegeId: selectedCollegeId,
-      programId: selectedProgramId,
-      batchId: selectedBatchId,
+      collegeId: selectedCollegeId === 'all' ? '' : selectedCollegeId,
+      programId: selectedProgramId === 'all' ? '' : selectedProgramId,
+      batchId: selectedBatchId === 'all' ? '' : selectedBatchId,
     });
     setEditingStudent(null);
   };
@@ -464,7 +474,7 @@ export function StudentManagementAdmin({ user }: { user: User }) {
                   <SelectValue placeholder="All Colleges" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Colleges</SelectItem>
+                  <SelectItem value="all">All Colleges</SelectItem>
                   {colleges.map((college) => (
                     <SelectItem key={college.id} value={college.id}>
                       {college.name}
@@ -480,7 +490,7 @@ export function StudentManagementAdmin({ user }: { user: User }) {
                   <SelectValue placeholder="Select college first" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Programs</SelectItem>
+                  <SelectItem value="all">All Programs</SelectItem>
                   {programs.map((program) => (
                     <SelectItem key={program.id} value={program.id}>
                       {program.name}
@@ -496,7 +506,7 @@ export function StudentManagementAdmin({ user }: { user: User }) {
                   <SelectValue placeholder="Select program first" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Batches</SelectItem>
+                  <SelectItem value="all">All Batches</SelectItem>
                   {batches.map((batch) => (
                     <SelectItem key={batch.id} value={batch.id}>
                       {batch.name} ({batch.startYear}-{batch.endYear})
