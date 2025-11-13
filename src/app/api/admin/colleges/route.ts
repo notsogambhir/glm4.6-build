@@ -79,7 +79,18 @@ export async function POST(request: NextRequest) {
       data: {
         name: name.trim(),
         code: code.trim().toUpperCase(),
-        description: description?.trim() || null
+        description: description?.trim() || null,
+        // Auto-create a department with the same name as the college
+        departments: {
+          create: {
+            name: name.trim(),
+            code: code.trim().toUpperCase(),
+            description: `Department of ${name.trim()} - Auto-created with college`
+          }
+        }
+      },
+      include: {
+        departments: true
       }
     });
 

@@ -261,7 +261,7 @@ export function DepartmentManagement() {
             <DialogHeader>
               <DialogTitle>Create New Department</DialogTitle>
               <DialogDescription>
-                Add a new department to the system
+                Add a new department to the system. Note: Each college can have only one department.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -387,7 +387,7 @@ export function DepartmentManagement() {
         <CardHeader>
           <CardTitle>Departments</CardTitle>
           <CardDescription>
-            Manage academic departments and their relationships with colleges
+            Manage academic departments. Each college can have exactly one department.
           </CardDescription>
         </CardHeader>
         <CardContent>

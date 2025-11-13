@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { canManageCollegeResources } from '@/lib/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,15 +11,26 @@ export async function GET(request: NextRequest) {
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'ADMIN') {
+    if (!user) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const collegeId = searchParams.get('collegeId');
 
+    // Check permissions
+    if (collegeId && !canManageCollegeResources(user, collegeId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // If user is department role, only show their college's departments
+    let whereClause = collegeId ? { collegeId } : {};
+    if (user.role === 'DEPARTMENT') {
+      whereClause = { collegeId: user.collegeId };
+    }
+
     const departments = await db.department.findMany({
-      where: collegeId ? { collegeId } : {},
+      where: whereClause,
       include: {
         college: {
           select: {
@@ -55,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'ADMIN') {
+    if (!user) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -66,6 +78,11 @@ export async function POST(request: NextRequest) {
         { error: 'Name, code, and college are required' },
         { status: 400 }
       );
+    }
+
+    // Check permissions - department users can only create departments in their college
+    if (!canManageCollegeResources(user, collegeId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Check if college exists
@@ -80,20 +97,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if department with same name or code already exists in this college
+    // Since we're enforcing 1:1 relationship, check if department already exists for this college
     const existingDepartment = await db.department.findFirst({
-      where: {
-        collegeId,
-        OR: [
-          { name: name },
-          { code: code }
-        ]
-      }
+      where: { collegeId }
     });
 
     if (existingDepartment) {
       return NextResponse.json(
-        { error: 'Department with this name or code already exists in this college' },
+        { error: 'Department already exists for this college. Each college can have only one department.' },
         { status: 409 }
       );
     }

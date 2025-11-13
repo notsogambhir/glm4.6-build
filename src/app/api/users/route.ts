@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/server-auth';
 import { hashPassword } from '@/lib/auth';
+import { canManageCollegeResources } from '@/lib/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,8 +45,8 @@ export async function GET(request: NextRequest) {
         break;
         
       case 'DEPARTMENT':
-        // Can only see users from their department (excluding students unless requested)
-        whereClause.departmentId = user.departmentId;
+        // Can only see users from their college (excluding students unless requested)
+        whereClause.collegeId = user.collegeId;
         if (!includeStudents) {
           whereClause.role = {
             notIn: ['STUDENT']
@@ -126,12 +127,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authentication - only ADMIN can create users
+    // Verify authentication - ADMIN and DEPARTMENT can create users
     const user = await getUserFromRequest(request);
     
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || !['ADMIN', 'DEPARTMENT'].includes(user.role)) {
       return NextResponse.json(
-        { error: 'Admin access required' },
+        { error: 'Admin or Department access required' },
         { status: 403 }
       );
     }
@@ -155,6 +156,16 @@ export async function POST(request: NextRequest) {
         { error: 'Name, password, and role are required' },
         { status: 400 }
       );
+    }
+
+    // Department users can only create users in their college
+    if (user.role === 'DEPARTMENT') {
+      if (collegeId && collegeId !== user.collegeId) {
+        return NextResponse.json(
+          { error: 'You can only create users in your college' },
+          { status: 403 }
+        );
+      }
     }
 
     // Check if email already exists
@@ -194,6 +205,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine college ID for new user
+    let finalCollegeId = collegeId;
+    if (user.role === 'DEPARTMENT') {
+      finalCollegeId = user.collegeId;
+    }
+
     // Hash password
     const hashedPassword = await hashPassword(password);
 
@@ -205,7 +222,7 @@ export async function POST(request: NextRequest) {
         employeeId: employeeId || null,
         password: hashedPassword,
         role,
-        collegeId: collegeId || null,
+        collegeId: finalCollegeId || null,
         departmentId: departmentId || null, // Keep for backward compatibility
         programId: programId || null,
         isActive: true

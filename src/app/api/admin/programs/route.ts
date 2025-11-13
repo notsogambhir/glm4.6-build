@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyToken } from '@/lib/auth';
+import { canManageCollegeResources } from '@/lib/permissions';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,15 +11,26 @@ export async function GET(request: NextRequest) {
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'ADMIN') {
+    if (!user) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const collegeId = searchParams.get('collegeId');
 
+    // Check permissions
+    if (collegeId && !canManageCollegeResources(user, collegeId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // If user is department role, only show their college's programs
+    let whereClause = collegeId ? { collegeId } : {};
+    if (user.role === 'DEPARTMENT') {
+      whereClause = { collegeId: user.collegeId };
+    }
+
     const programs = await db.program.findMany({
-      where: collegeId ? { collegeId } : {},
+      where: whereClause,
       include: {
         college: {
           select: {
@@ -68,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'ADMIN') {
+    if (!user) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -79,6 +91,11 @@ export async function POST(request: NextRequest) {
         { error: 'Name, code, college, and duration are required' },
         { status: 400 }
       );
+    }
+
+    // Check permissions - department users can only create programs in their college
+    if (!canManageCollegeResources(user, collegeId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Validate duration
@@ -101,10 +118,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auto-assign department if not provided (since each college has exactly one department)
+    let finalDepartmentId = departmentId;
+    if (!finalDepartmentId) {
+      const department = await db.department.findFirst({
+        where: { collegeId }
+      });
+      finalDepartmentId = department?.id || null;
+    }
+
     // Check if department exists (if provided)
-    if (departmentId) {
+    if (finalDepartmentId) {
       const department = await db.department.findUnique({
-        where: { id: departmentId }
+        where: { id: finalDepartmentId }
       });
 
       if (!department) {
@@ -138,7 +164,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         code: code.trim().toUpperCase(),
         collegeId,
-        departmentId: departmentId || null,
+        departmentId: finalDepartmentId || null,
         duration: parseInt(duration),
         description: description?.trim() || null
       },

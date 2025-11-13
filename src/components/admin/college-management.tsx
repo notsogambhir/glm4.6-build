@@ -17,6 +17,11 @@ interface College {
   code: string;
   description?: string;
   isActive: boolean;
+  departments?: Array<{
+    id: string;
+    name: string;
+    code: string;
+  }>;
   _count: {
     departments: number;
     programs: number;
@@ -222,7 +227,7 @@ export function CollegeManagement() {
             <DialogHeader>
               <DialogTitle>Create New College</DialogTitle>
               <DialogDescription>
-                Add a new college to the system
+                Add a new college to the system. A department with the same name will be automatically created.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -287,9 +292,16 @@ export function CollegeManagement() {
             </CardHeader>
             <CardContent>
               {college.description && (
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-2">
                   {college.description}
                 </p>
+              )}
+              
+              {college.departments && college.departments.length > 0 && (
+                <div className="bg-blue-50 p-2 rounded mb-4">
+                  <p className="text-xs text-blue-700 font-medium mb-1">Auto-created Department:</p>
+                  <p className="text-sm text-blue-800">{college.departments[0].name} ({college.departments[0].code})</p>
+                </div>
               )}
               
               <div className="grid grid-cols-3 gap-4 mb-4">

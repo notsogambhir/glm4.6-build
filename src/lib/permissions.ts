@@ -11,10 +11,10 @@ export enum Permission {
   VIEW_COURSES = 'VIEW_COURSES',
   MANAGE_COURSE = 'MANAGE_COURSE',
   
-  // Student permissions
-  CREATE_STUDENT = 'CREATE_STUDENT',
-  VIEW_STUDENTS = 'VIEW_STUDENTS',
-  MANAGE_STUDENT = 'MANAGE_STUDENT',
+  // Faculty permissions
+  CREATE_FACULTY = 'CREATE_FACULTY',
+  VIEW_FACULTY = 'VIEW_FACULTY',
+  MANAGE_FACULTY = 'MANAGE_FACULTY',
   
   // Admin permissions
   MANAGE_COLLEGES = 'MANAGE_COLLEGES',
@@ -47,20 +47,24 @@ export function hasPermission(user: AuthUser | null, permission: Permission): bo
     case Permission.VIEW_COURSES:
       return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR', 'TEACHER'].includes(role);
     
-    // Student permissions
-    case Permission.CREATE_STUDENT:
-    case Permission.MANAGE_STUDENT:
-      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR'].includes(role);
-    
-    case Permission.VIEW_STUDENTS:
-      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT', 'PROGRAM_COORDINATOR', 'TEACHER'].includes(role);
+    // Faculty permissions
+    case Permission.CREATE_FACULTY:
+    case Permission.MANAGE_FACULTY:
+    case Permission.VIEW_FACULTY:
+      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(role);
     
     // Admin permissions
     case Permission.MANAGE_COLLEGES:
-    case Permission.MANAGE_DEPARTMENTS:
-    case Permission.MANAGE_PROGRAMS:
-    case Permission.MANAGE_USERS:
       return ['ADMIN', 'UNIVERSITY'].includes(role);
+    
+    case Permission.MANAGE_DEPARTMENTS:
+      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(role);
+    
+    case Permission.MANAGE_PROGRAMS:
+      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(role);
+    
+    case Permission.MANAGE_USERS:
+      return ['ADMIN', 'UNIVERSITY', 'DEPARTMENT'].includes(role);
     
     default:
       return false;
@@ -79,8 +83,12 @@ export function canManageCourse(user: AuthUser | null): boolean {
   return hasPermission(user, Permission.MANAGE_COURSE);
 }
 
-export function canCreateStudent(user: AuthUser | null): boolean {
-  return hasPermission(user, Permission.CREATE_STUDENT);
+export function canCreateFaculty(user: AuthUser | null): boolean {
+  return hasPermission(user, Permission.CREATE_FACULTY);
+}
+
+export function canManageFaculty(user: AuthUser | null): boolean {
+  return hasPermission(user, Permission.MANAGE_FACULTY);
 }
 
 export function canManageCollege(user: AuthUser | null): boolean {
@@ -93,4 +101,37 @@ export function canManageDepartment(user: AuthUser | null): boolean {
 
 export function canManageProgram(user: AuthUser | null): boolean {
   return hasPermission(user, Permission.MANAGE_PROGRAMS);
+}
+
+export function canManageCollegeResources(user: AuthUser | null, collegeId?: string): boolean {
+  if (!user) return false;
+  
+  // Admin and University can manage all colleges
+  if (['ADMIN', 'UNIVERSITY'].includes(user.role)) return true;
+  
+  // Department users can only manage their own college
+  if (user.role === 'DEPARTMENT' && collegeId && user.collegeId === collegeId) {
+    return true;
+  }
+  
+  return false;
+}
+
+export function canAccessCollege(user: AuthUser | null, collegeId?: string): boolean {
+  if (!user) return false;
+  
+  // Admin and University can access all colleges
+  if (['ADMIN', 'UNIVERSITY'].includes(user.role)) return true;
+  
+  // Department users can only access their own college
+  if (user.role === 'DEPARTMENT' && collegeId && user.collegeId === collegeId) {
+    return true;
+  }
+  
+  // Other roles can access if they belong to the college
+  if (collegeId && user.collegeId === collegeId) {
+    return true;
+  }
+  
+  return false;
 }
