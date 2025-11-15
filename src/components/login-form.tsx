@@ -65,15 +65,7 @@ export function LoginForm() {
     const validationErrors: string[] = [];
     if (!formData.email) validationErrors.push("Email is required");
     if (!formData.password) validationErrors.push("Password is required");
-    
-    // Only require college selection for non-admin roles
-    const emailDomain = formData.email.toLowerCase();
-    const isAdminRole = emailDomain.includes('admin@obeportal.com') || 
-                       emailDomain.includes('university@obeportal.com');
-    
-    if (!isAdminRole && !formData.collegeId) {
-      validationErrors.push("College selection is required for your role");
-    }
+    if (!formData.collegeId) validationErrors.push("College selection is required");
     
     if (validationErrors.length > 0) {
       toast({
@@ -168,6 +160,12 @@ export function LoginForm() {
         } else {
           throw new Error(`College with code ${collegeCode} not found`);
         }
+      } else {
+        // For admin and university users, collegeId is not required
+        // Set it to empty string explicitly if not already set
+        if (!collegeId) {
+          collegeId = '';
+        }
       }
 
       console.log('Attempting quick login:', { email, collegeId, collegeCode });
@@ -239,7 +237,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('admin@obeportal.com', 'password123')}
+                  onClick={() => handleQuickLogin('admin@obeportal.com', 'admin123')}
                   className="text-xs"
                 >
                   Admin
@@ -248,7 +246,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('university@obeportal.com', 'password123')}
+                  onClick={() => handleQuickLogin('university@obeportal.com', 'university123')}
                   className="text-xs"
                 >
                   University
@@ -257,16 +255,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('cbs@obeportal.com', 'password123', 'CBS')}
-                  className="text-xs"
-                >
-                  Dept Head (CBS)
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickLogin('cuiet@obeportal.com', 'password123', 'CUIET')}
+                  onClick={() => handleQuickLogin('cse@obeportal.com', 'department123', 'CUIET')}
                   className="text-xs"
                 >
                   Dept Head (CUIET)
@@ -275,7 +264,16 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('pc.bba@obeportal.com', 'password123', 'CBS')}
+                  onClick={() => handleQuickLogin('business@obeportal.com', 'department123', 'CBS')}
+                  className="text-xs"
+                >
+                  Dept Head (CBS)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickLogin('pc.bba@obeportal.com', 'coordinator123', 'CBS')}
                   className="text-xs"
                 >
                   Program Coord (BBA)
@@ -284,7 +282,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('pc.beme@obeportal.com', 'password123', 'CUIET')}
+                  onClick={() => handleQuickLogin('pc.beme@obeportal.com', 'coordinator123', 'CUIET')}
                   className="text-xs"
                 >
                   Program Coord (BE ME)
@@ -293,7 +291,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('teacher1@obeportal.com', 'password123', 'CUIET')}
+                  onClick={() => handleQuickLogin('teacher1@obeportal.com', 'teacher123', 'CUIET')}
                   className="text-xs"
                 >
                   Teacher 1 (CUIET)
@@ -302,7 +300,7 @@ export function LoginForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => handleQuickLogin('teacher2@obeportal.com', 'password123', 'CBS')}
+                  onClick={() => handleQuickLogin('teacher2@obeportal.com', 'teacher123', 'CBS')}
                   className="text-xs"
                 >
                   Teacher 2 (CBS)
@@ -310,9 +308,10 @@ export function LoginForm() {
               </div>
               <div className="mt-3 space-y-1 text-xs text-blue-600">
                 <p><strong>Passwords:</strong></p>
-                <p>• All accounts use: password123</p>
-                <p>• Admin accounts don't need college selection</p>
-                <p>• Other roles must select their college</p>
+                <p>• Admin/University: admin123 / university123</p>
+                <p>• Department Head: department123</p>
+                <p>• Program Coordinator: coordinator123</p>
+                <p>• Teacher: teacher123</p>
               </div>
             </div>
 

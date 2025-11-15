@@ -105,9 +105,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
-  const [selectedProgramId, setSelectedProgramId] = useState<string>('all');
-  const [selectedBatchId, setSelectedBatchId] = useState<string>('all');
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
+  const [selectedProgramId, setSelectedProgramId] = useState<string>('');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [formData, setFormData] = useState<StudentFormData>({
@@ -167,9 +167,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
       setLoading(true);
       const params = new URLSearchParams();
       
-      if (selectedCollegeId && selectedCollegeId !== 'all') params.append('collegeId', selectedCollegeId);
-      if (selectedProgramId && selectedProgramId !== 'all') params.append('programId', selectedProgramId);
-      if (selectedBatchId && selectedBatchId !== 'all') params.append('batchId', selectedBatchId);
+      if (selectedCollegeId) params.append('collegeId', selectedCollegeId);
+      if (selectedProgramId) params.append('programId', selectedProgramId);
+      if (selectedBatchId) params.append('batchId', selectedBatchId);
 
       const response = await fetch(`/api/students?${params}`);
       if (response.ok) {
@@ -191,22 +191,14 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   }, []);
 
   useEffect(() => {
-    if (selectedCollegeId && selectedCollegeId !== 'all') {
-      fetchPrograms(selectedCollegeId);
-    } else {
-      setPrograms([]);
-    }
-    setSelectedProgramId('all');
-    setSelectedBatchId('all');
+    fetchPrograms(selectedCollegeId);
+    setSelectedProgramId('');
+    setSelectedBatchId('');
   }, [selectedCollegeId]);
 
   useEffect(() => {
-    if (selectedProgramId && selectedProgramId !== 'all') {
-      fetchBatches(selectedProgramId);
-    } else {
-      setBatches([]);
-    }
-    setSelectedBatchId('all');
+    fetchBatches(selectedProgramId);
+    setSelectedBatchId('');
   }, [selectedProgramId]);
 
   useEffect(() => {
@@ -216,11 +208,11 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   // Handle college selection change
   const handleCollegeChange = (collegeId: string) => {
     setSelectedCollegeId(collegeId);
-    setSelectedProgramId('all');
-    setSelectedBatchId('all');
+    setSelectedProgramId('');
+    setSelectedBatchId('');
     setFormData(prev => ({
       ...prev,
-      collegeId: collegeId === 'all' ? '' : collegeId,
+      collegeId,
       programId: '',
       batchId: '',
     }));
@@ -229,10 +221,10 @@ export function StudentManagementAdmin({ user }: { user: User }) {
   // Handle program selection change
   const handleProgramChange = (programId: string) => {
     setSelectedProgramId(programId);
-    setSelectedBatchId('all');
+    setSelectedBatchId('');
     setFormData(prev => ({
       ...prev,
-      programId: programId === 'all' ? '' : programId,
+      programId,
       batchId: '',
     }));
   };
@@ -242,14 +234,12 @@ export function StudentManagementAdmin({ user }: { user: User }) {
     setSelectedBatchId(batchId);
     setFormData(prev => ({
       ...prev,
-      batchId: batchId === 'all' ? '' : batchId,
+      batchId,
     }));
   };
 
   // Check if user can upload students
-  const canUploadStudents = selectedCollegeId && selectedCollegeId !== 'all' && 
-                          selectedProgramId && selectedProgramId !== 'all' && 
-                          selectedBatchId && selectedBatchId !== 'all';
+  const canUploadStudents = selectedCollegeId && selectedProgramId && selectedBatchId;
 
   // Filter students based on search term
   const filteredStudents = students.filter(student =>
@@ -399,9 +389,9 @@ export function StudentManagementAdmin({ user }: { user: User }) {
       name: '',
       email: '',
       password: '',
-      collegeId: selectedCollegeId === 'all' ? '' : selectedCollegeId,
-      programId: selectedProgramId === 'all' ? '' : selectedProgramId,
-      batchId: selectedBatchId === 'all' ? '' : selectedBatchId,
+      collegeId: selectedCollegeId,
+      programId: selectedProgramId,
+      batchId: selectedBatchId,
     });
     setEditingStudent(null);
   };

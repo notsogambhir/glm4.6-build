@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUser, generateToken } from '@/lib/auth';
-import { withLogging, createRequestContext, authLogger } from '@/lib/api-logger';
 
-export const POST = withLogging(async (request: NextRequest) => {
-  const { requestId, startTime } = createRequestContext(request);
-  
+export async function POST(request: NextRequest) {
   try {
     const { email, password, collegeId } = await request.json();
     
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Email:', email);
+    console.log('College ID:', collegeId);
+
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
@@ -18,16 +19,22 @@ export const POST = withLogging(async (request: NextRequest) => {
     const user = await authenticateUser(email, password, collegeId);
 
     if (!user) {
-      authLogger('login_failed', new Error('Authentication failed'), {
-        email,
-        requestId,
-      });
-      
+      console.log('Authentication failed for:', email);
       return NextResponse.json(
         { error: 'Invalid credentials or college access denied' },
         { status: 401 }
       );
     }
+
+    console.log('Authentication successful for user:', {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      collegeId: user.collegeId,
+      departmentId: user.departmentId,
+      programId: user.programId
+    });
 
     const token = generateToken({
       id: user.id,
@@ -39,6 +46,7 @@ export const POST = withLogging(async (request: NextRequest) => {
       programId: user.programId || null,
       batchId: user.batchId || null,
     });
+    console.log('Generated token (first 20 chars):', token.substring(0, 20) + '...');
 
     const response = NextResponse.json({
       user: {
@@ -60,8 +68,13 @@ export const POST = withLogging(async (request: NextRequest) => {
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
 
+    console.log('Cookie set in response');
     return response;
   } catch (error) {
-    throw error;
+    console.error('Login error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-});
+}

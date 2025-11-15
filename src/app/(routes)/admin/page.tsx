@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CollegeManagement } from '@/components/admin/college-management';
 import { ProgramManagement } from '@/components/admin/program-management';
 import { BatchManagement } from '@/components/admin/batch-management';
-import { Building2, GraduationCap, Calendar, Settings, Bug } from 'lucide-react';
+import { Building2, GraduationCap, Calendar, Settings } from 'lucide-react';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('colleges');
@@ -24,7 +24,7 @@ export default function AdminPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="colleges" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
             <span>Colleges</span>
@@ -36,10 +36,6 @@ export default function AdminPage() {
           <TabsTrigger value="batches" className="flex items-center space-x-2">
             <Calendar className="h-4 w-4" />
             <span>Batches</span>
-          </TabsTrigger>
-          <TabsTrigger value="errors" className="flex items-center space-x-2">
-            <Bug className="h-4 w-4" />
-            <span>Error Management</span>
           </TabsTrigger>
         </TabsList>
 
@@ -90,42 +86,6 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <BatchManagement />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="errors" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Bug className="h-5 w-5" />
-                <span>Error Management</span>
-              </CardTitle>
-              <CardDescription>
-                Monitor and analyze application errors, performance metrics, and system health.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Access the comprehensive error management dashboard to:
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
-                  <li>• View real-time error logs and alerts</li>
-                  <li>• Analyze error trends and patterns</li>
-                  <li>• Monitor system performance metrics</li>
-                  <li>• Export error reports for analysis</li>
-                  <li>• Configure error notifications</li>
-                </ul>
-                <div className="pt-4">
-                  <a 
-                    href="/error-management"
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                  >
-                    Open Error Dashboard
-                  </a>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
