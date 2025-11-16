@@ -1,4 +1,4 @@
-import { db } from './src/lib/db';
+import { db } from './db';
 import bcrypt from 'bcryptjs';
 
 async function seed() {
@@ -145,13 +145,13 @@ async function seed() {
           endYear: 2024,
         },
       }),
-      // BBA Batches
+      // BEME Additional Batch
       db.batch.create({
         data: {
-          name: '2021-2025',
+          name: '2022-2026',
           programId: programs[0].id,
-          startYear: 2021,
-          endYear: 2025,
+          startYear: 2022,
+          endYear: 2026,
         },
       }),
       // BBA Batches
