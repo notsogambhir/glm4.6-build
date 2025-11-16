@@ -14,7 +14,6 @@ export function transformDbUserToUser(dbUser: DbUser): User {
     name: dbUser.name,
     role: dbUser.role,
     collegeId: dbUser.collegeId || undefined,
-    departmentId: dbUser.departmentId || undefined,
     programId: dbUser.programId || undefined,
     batchId: dbUser.batchId || undefined,
   };
@@ -27,7 +26,6 @@ export function transformDbUserToAuthUser(dbUser: DbUser): AuthUser {
     name: dbUser.name,
     role: dbUser.role,
     collegeId: dbUser.collegeId,
-    departmentId: dbUser.departmentId,
     programId: dbUser.programId,
     batchId: dbUser.batchId,
   };
@@ -49,7 +47,6 @@ export function generateToken(user: User | AuthUser): string {
       name: user.name,
       role: user.role,
       collegeId: user.collegeId,
-      departmentId: user.departmentId,
       programId: user.programId,
       batchId: user.batchId,
     },
@@ -72,7 +69,6 @@ export async function authenticateUser(email: string, password: string, collegeI
     where: { email },
     include: {
       college: true,
-      department: true,
       program: true,
     },
   });

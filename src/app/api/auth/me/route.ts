@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       name: user.name,
       role: user.role,
       collegeId: user.collegeId,
-      departmentId: user.departmentId,
       programId: user.programId
     } : 'null');
 

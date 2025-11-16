@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       include: {
         _count: {
           select: {
-            departments: true,
             programs: true,
             users: true
           }
@@ -80,14 +79,6 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         code: code.trim().toUpperCase(),
         description: description?.trim() || null,
-        // Auto-create a department with the same name as the college
-        departments: {
-          create: {
-            name: name.trim(),
-            code: code.trim().toUpperCase(),
-            description: `Department of ${name.trim()} - Auto-created with college`
-          }
-        }
       },
       include: {
         departments: true

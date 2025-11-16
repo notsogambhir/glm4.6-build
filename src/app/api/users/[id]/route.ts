@@ -27,8 +27,6 @@ export async function PUT(
       password,
       role,
       collegeId,
-      departmentId,
-      departmentIds,
       programId,
       isActive
     } = body;
@@ -93,7 +91,6 @@ export async function PUT(
     if (password) updateData.password = await hashPassword(password);
     if (role !== undefined) updateData.role = role;
     if (collegeId !== undefined) updateData.collegeId = collegeId || null;
-    if (departmentId !== undefined) updateData.departmentId = departmentId || null;
     if (programId !== undefined) updateData.programId = programId || null;
     if (isActive !== undefined) updateData.isActive = isActive;
 
@@ -102,12 +99,6 @@ export async function PUT(
       where: { id: params.id },
       data: updateData,
       include: {
-        department: {
-          select: {
-            name: true,
-            code: true
-          }
-        },
         program: {
           select: {
             name: true,
@@ -119,81 +110,9 @@ export async function PUT(
             name: true,
             code: true
           }
-        },
-        userDepartments: {
-          include: {
-            department: {
-              select: {
-                id: true,
-                name: true,
-                code: true
-              }
-            }
-          }
         }
       }
     });
-
-    // Handle multiple department assignments for teachers
-    if (role === 'TEACHER' && departmentIds !== undefined) {
-      // Delete existing department assignments
-      await db.userDepartment.deleteMany({
-        where: { userId: params.id }
-      });
-
-      // Add new department assignments if provided
-      if (departmentIds.length > 0) {
-        const userDepartmentData = departmentIds.map((deptId: string) => ({
-          userId: params.id,
-          departmentId: deptId,
-          isActive: true
-        }));
-
-        await db.userDepartment.createMany({
-          data: userDepartmentData
-        });
-      }
-
-      // Fetch the updated user with departments
-      const finalUser = await db.user.findUnique({
-        where: { id: params.id },
-        include: {
-          department: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          program: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          college: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          userDepartments: {
-            include: {
-              department: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = finalUser!;
-      return NextResponse.json(userWithoutPassword);
-    }
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = updatedUser;

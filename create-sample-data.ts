@@ -28,18 +28,6 @@ async function createSampleData() {
     
     console.log('Created college:', college.name);
     
-    // Create department
-    const department = await db.department.create({
-      data: {
-        name: 'Computer Science',
-        code: 'CS',
-        collegeId: college.id,
-        description: 'Computer Science Department'
-      }
-    });
-    
-    console.log('Created department:', department.name);
-    
     // Create teacher
     const teacherPassword = await bcrypt.hash('teacher123', 10);
     const teacher = await db.user.create({
@@ -50,7 +38,6 @@ async function createSampleData() {
         name: 'Teacher User',
         role: 'TEACHER',
         collegeId: college.id,
-        departmentId: department.id,
         isActive: true
       }
     });
@@ -67,7 +54,6 @@ async function createSampleData() {
         name: 'Student User',
         role: 'STUDENT',
         collegeId: college.id,
-        departmentId: department.id,
         isActive: true
       }
     });

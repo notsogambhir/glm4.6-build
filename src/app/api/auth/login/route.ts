@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
       name: user.name,
       role: user.role,
       collegeId: user.collegeId,
-      departmentId: user.departmentId,
       programId: user.programId
     });
 
@@ -42,7 +41,6 @@ export async function POST(request: NextRequest) {
       name: user.name,
       role: user.role,
       collegeId: user.collegeId || null,
-      departmentId: user.departmentId || null,
       programId: user.programId || null,
       batchId: user.batchId || null,
     });
@@ -55,7 +53,6 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
         collegeId: user.collegeId,
-        departmentId: user.departmentId,
         programId: user.programId,
       },
       token,

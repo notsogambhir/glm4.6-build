@@ -18,7 +18,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { name, code, collegeId, departmentId, duration, description, isActive } = await request.json();
+    const { name, code, collegeId, duration, description, isActive } = await request.json();
 
     if (!name || !code || !collegeId || !duration) {
       return NextResponse.json(
@@ -59,20 +59,6 @@ export async function PUT(
       );
     }
 
-    // Check if department exists (if provided)
-    if (departmentId) {
-      const department = await db.department.findUnique({
-        where: { id: departmentId }
-      });
-
-      if (!department) {
-        return NextResponse.json(
-          { error: 'Department not found' },
-          { status: 404 }
-        );
-      }
-    }
-
     // Check if another program with same name or code exists in this college
     const duplicateProgram = await db.program.findFirst({
       where: {
@@ -102,20 +88,12 @@ export async function PUT(
         name: name.trim(),
         code: code.trim().toUpperCase(),
         collegeId,
-        departmentId: departmentId || null,
         duration: parseInt(duration),
         description: description?.trim() || null,
         isActive: isActive !== undefined ? isActive : existingProgram.isActive
       },
       include: {
         college: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        },
-        department: {
           select: {
             id: true,
             name: true,

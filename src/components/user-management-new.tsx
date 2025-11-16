@@ -53,15 +53,10 @@ interface User {
   name: string;
   role: string;
   collegeId?: string;
-  departmentId?: string;
   programId?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  department?: {
-    name: string;
-    code: string;
-  };
   program?: {
     name: string;
     code: string;
@@ -70,15 +65,6 @@ interface User {
     name: string;
     code: string;
   };
-  userDepartments?: {
-    id: string;
-    department: {
-      id: string;
-      name: string;
-      code: string;
-    };
-    isActive: boolean;
-  }[];
 }
 
 interface College {
@@ -87,25 +73,17 @@ interface College {
   code: string;
 }
 
-interface Department {
-  id: string;
-  name: string;
-  code: string;
-  collegeId: string;
-}
-
 interface Program {
   id: string;
   name: string;
   code: string;
   collegeId: string;
-  departmentId?: string;
 }
 
 const USER_ROLES = [
   { value: 'ADMIN', label: 'Administrator' },
   { value: 'UNIVERSITY', label: 'University Admin' },
-  { value: 'DEPARTMENT', label: 'Department Head' },
+  { value: 'DEPARTMENT', label: 'College Head' },
   { value: 'PROGRAM_COORDINATOR', label: 'Program Coordinator' },
   { value: 'TEACHER', label: 'Teacher' },
 ];
@@ -114,12 +92,10 @@ export function UserManagement() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [colleges, setColleges] = useState<College[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('');
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCollege, setSelectedCollege] = useState<string>('');
   const [showInactive, setShowInactive] = useState(false);
 
@@ -137,15 +113,12 @@ export function UserManagement() {
     password: '',
     role: '',
     collegeId: '',
-    departmentId: '',
-    departmentIds: [] as string[],
     programId: '',
   });
 
   useEffect(() => {
     fetchUsers();
     fetchColleges();
-    fetchDepartments();
     fetchPrograms();
   }, []);
 
@@ -153,7 +126,6 @@ export function UserManagement() {
     try {
       const params = new URLSearchParams();
       if (selectedRole) params.append('role', selectedRole);
-      if (selectedDepartment) params.append('departmentId', selectedDepartment);
       if (selectedCollege) params.append('collegeId', selectedCollege);
       
       const response = await fetch(`/api/users?${params.toString()}`);
@@ -181,18 +153,6 @@ export function UserManagement() {
     }
   };
 
-  const fetchDepartments = async () => {
-    try {
-      const response = await fetch('/api/departments');
-      if (response.ok) {
-        const data = await response.json();
-        setDepartments(data);
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
-  };
-
   const fetchPrograms = async () => {
     try {
       const response = await fetch('/api/programs');
@@ -213,8 +173,6 @@ export function UserManagement() {
       password: '',
       role: '',
       collegeId: 'none',
-      departmentId: 'none',
-      departmentIds: [] as string[],
       programId: 'none',
     });
   };
@@ -225,17 +183,11 @@ export function UserManagement() {
       return;
     }
 
-    if (formData.role === 'TEACHER' && formData.departmentIds.length === 0) {
-      toast.error('Teachers must be assigned to at least one department');
-      return;
-    }
-
     setSubmitting(true);
     try {
       const submitData = {
         ...formData,
         collegeId: formData.collegeId === 'none' ? null : formData.collegeId,
-        departmentId: formData.departmentId === 'none' ? null : formData.departmentId,
         programId: formData.programId === 'none' ? null : formData.programId,
       };
 
@@ -270,17 +222,11 @@ export function UserManagement() {
       return;
     }
 
-    if (formData.role === 'TEACHER' && formData.departmentIds.length === 0) {
-      toast.error('Teachers must be assigned to at least one department');
-      return;
-    }
-
     setSubmitting(true);
     try {
       const submitData = {
         ...formData,
         collegeId: formData.collegeId === 'none' ? null : formData.collegeId,
-        departmentId: formData.departmentId === 'none' ? null : formData.departmentId,
         programId: formData.programId === 'none' ? null : formData.programId,
       };
 
@@ -361,8 +307,6 @@ export function UserManagement() {
       password: '',
       role: user.role,
       collegeId: user.collegeId || 'none',
-      departmentId: user.departmentId || 'none',
-      departmentIds: user.userDepartments?.map(ud => ud.department.id) || [],
       programId: user.programId || 'none',
     });
     setIsEditDialogOpen(true);
@@ -373,20 +317,14 @@ export function UserManagement() {
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.employeeId?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = !selectedRole || selectedRole === 'all' || user.role === selectedRole;
-    const matchesDepartment = !selectedDepartment || selectedDepartment === 'all' || user.departmentId === selectedDepartment;
     const matchesCollege = !selectedCollege || selectedCollege === 'all' || user.collegeId === selectedCollege;
     const matchesStatus = showInactive || user.isActive;
     
-    return matchesSearch && matchesRole && matchesDepartment && matchesCollege && matchesStatus;
+    return matchesSearch && matchesRole && matchesCollege && matchesStatus;
   });
 
-  const availableDepartments = departments.filter(dept => 
-    !selectedCollege || selectedCollege === 'all' || dept.collegeId === selectedCollege
-  );
-
   const availablePrograms = programs.filter(program => 
-    (!selectedCollege || selectedCollege === 'all' || program.collegeId === selectedCollege) &&
-    (!selectedDepartment || selectedDepartment === 'all' || program.departmentId === selectedDepartment)
+    !selectedCollege || selectedCollege === 'all' || program.collegeId === selectedCollege
   );
 
   if (loading) {
@@ -432,7 +370,7 @@ export function UserManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="search">Search</Label>
               <Input
@@ -469,22 +407,6 @@ export function UserManagement() {
                   {colleges.map((college) => (
                     <SelectItem key={college.id} value={college.id}>
                       {college.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="department">Department</Label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {availableDepartments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -574,7 +496,7 @@ export function UserManagement() {
               </div>
               <div>
                 <Label htmlFor="college">College</Label>
-                <Select value={formData.collegeId} onValueChange={(value) => setFormData({ ...formData, collegeId: value === 'none' ? '' : value, departmentId: '', programId: '' })}>
+                <Select value={formData.collegeId} onValueChange={(value) => setFormData({ ...formData, collegeId: value === 'none' ? '' : value, programId: '' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select college" />
                   </SelectTrigger>
@@ -589,75 +511,18 @@ export function UserManagement() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="department">Department</Label>
-                <Select 
-                  value={formData.departmentId} 
-                  onValueChange={(value) => setFormData({ ...formData, departmentId: value === 'none' ? '' : value, programId: '' })}
-                  disabled={!formData.collegeId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {availableDepartments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {/* Multiple Department Selection for Teachers */}
-              {formData.role === 'TEACHER' && (
-                <div className="col-span-2">
-                  <Label htmlFor="departments">Departments</Label>
-                  <div className="mt-2 space-y-2 max-h-32 overflow-y-auto border rounded p-3">
-                    {availableDepartments.map((dept) => (
-                      <div key={dept.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={dept.id}
-                          checked={formData.departmentIds.includes(dept.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setFormData({ 
-                                ...formData, 
-                                departmentIds: [...formData.departmentIds, dept.id] 
-                              });
-                            } else {
-                              setFormData({ 
-                                ...formData, 
-                                departmentIds: formData.departmentIds.filter(id => id !== dept.id) 
-                              });
-                            }
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor={dept.id} className="text-sm font-medium">
-                          {dept.name} ({dept.code})
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {formData.departmentIds.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">Select at least one department for teacher</p>
-                  )}
-                </div>
-              )}
-              <div>
                 <Label htmlFor="program">Program</Label>
                 <Select 
                   value={formData.programId} 
                   onValueChange={(value) => setFormData({ ...formData, programId: value === 'none' ? '' : value })}
-                  disabled={!formData.departmentId}
+                  disabled={!formData.collegeId}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select program" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {availablePrograms.map((program) => (
+                    {programs.filter(program => !formData.collegeId || program.collegeId === formData.collegeId).map((program) => (
                       <SelectItem key={program.id} value={program.id}>
                         {program.name}
                       </SelectItem>
@@ -736,16 +601,10 @@ export function UserManagement() {
                             {user.college.name}
                           </Badge>
                         )}
-                        {/* Show multiple departments for teachers */}
-                        {user.role === 'TEACHER' && user.userDepartments && user.userDepartments.length > 0 ? (
-                          user.userDepartments.map((ud, index) => (
-                            <Badge key={ud.id} variant="secondary" className="text-xs">
-                              {ud.department.name}
-                            </Badge>
-                          ))
-                        ) : user.department && user.role !== 'TEACHER' ? (
+                        {/* Show college for all users */}
+                        {user.college && user.role !== 'STUDENT' ? (
                           <Badge variant="secondary" className="text-xs">
-                            {user.department.name}
+                            {user.college.name}
                           </Badge>
                         ) : null}
                         {user.program && (
@@ -893,75 +752,18 @@ export function UserManagement() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="edit-department">Department</Label>
-              <Select 
-                value={formData.departmentId} 
-                onValueChange={(value) => setFormData({ ...formData, departmentId: value === 'none' ? '' : value, programId: '' })}
-                disabled={!formData.collegeId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {availableDepartments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Multiple Department Selection for Teachers */}
-            {formData.role === 'TEACHER' && (
-              <div className="col-span-2">
-                <Label htmlFor="edit-departments">Departments</Label>
-                <div className="mt-2 space-y-2 max-h-32 overflow-y-auto border rounded p-3">
-                  {availableDepartments.map((dept) => (
-                    <div key={dept.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={`edit-${dept.id}`}
-                        checked={formData.departmentIds.includes(dept.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({ 
-                              ...formData, 
-                              departmentIds: [...formData.departmentIds, dept.id] 
-                            });
-                          } else {
-                            setFormData({ 
-                              ...formData, 
-                              departmentIds: formData.departmentIds.filter(id => id !== dept.id) 
-                            });
-                          }
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={`edit-${dept.id}`} className="text-sm font-medium">
-                        {dept.name} ({dept.code})
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                {formData.departmentIds.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-1">Select at least one department for teacher</p>
-                )}
-              </div>
-            )}
-            <div>
               <Label htmlFor="edit-program">Program</Label>
               <Select 
                 value={formData.programId} 
                 onValueChange={(value) => setFormData({ ...formData, programId: value === 'none' ? '' : value })}
-                disabled={!formData.departmentId}
+                disabled={!formData.collegeId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select program" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  {availablePrograms.map((program) => (
+                  {programs.filter(program => !formData.collegeId || program.collegeId === formData.collegeId).map((program) => (
                     <SelectItem key={program.id} value={program.id}>
                       {program.name}
                     </SelectItem>

@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
     const programId = searchParams.get('programId');
     const batchId = searchParams.get('batchId');
     const collegeId = searchParams.get('collegeId');
-    const departmentId = searchParams.get('departmentId');
 
     // Build where clause based on user role and provided parameters
     let whereClause: any = { 
@@ -46,23 +45,11 @@ export async function GET(request: NextRequest) {
         whereClause.batchId = user.batchId;
       }
 
-      // If collegeId or departmentId are provided, filter by programs/batches under those entities
+      // If collegeId is provided, filter by programs under that college
       if (collegeId && !programId) {
         // Find all programs under this college
         const programs = await db.program.findMany({
           where: { collegeId },
-          select: { id: true }
-        });
-        const programIds = programs.map(p => p.id);
-        if (programIds.length > 0) {
-          whereClause.programId = { in: programIds };
-        }
-      }
-
-      if (departmentId && !programId) {
-        // Find all programs under this department
-        const programs = await db.program.findMany({
-          where: { departmentId },
           select: { id: true }
         });
         const programIds = programs.map(p => p.id);
@@ -78,18 +65,6 @@ export async function GET(request: NextRequest) {
         // Find all programs under this college
         const programs = await db.program.findMany({
           where: { collegeId },
-          select: { id: true }
-        });
-        const programIds = programs.map(p => p.id);
-        if (programIds.length > 0) {
-          whereClause.programId = { in: programIds };
-        }
-      }
-
-      if (departmentId && !programId) {
-        // Find all programs under this department
-        const programs = await db.program.findMany({
-          where: { departmentId },
           select: { id: true }
         });
         const programIds = programs.map(p => p.id);

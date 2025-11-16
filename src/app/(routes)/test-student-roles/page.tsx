@@ -15,7 +15,6 @@ interface User {
   name: string;
   role: string;
   collegeId?: string;
-  departmentId?: string;
   programId?: string;
   batchId?: string;
 }
@@ -54,7 +53,7 @@ export default function TestStudentRolesPage() {
   const renderStudentManagement = () => {
     switch (selectedUser.role) {
       case 'DEPARTMENT':
-        return <StudentManagementDepartment user={selectedUser} />;
+        return <StudentManagementAdmin user={selectedUser} />;
       case 'PROGRAM_COORDINATOR':
         return <StudentManagementProgramCoordinator user={selectedUser} />;
       case 'TEACHER':
@@ -115,7 +114,7 @@ export default function TestStudentRolesPage() {
                   <>
                     <li>• Full student management (Create, Read, Update, Delete)</li>
                     <li>• Bulk upload functionality</li>
-                    <li>• Access to all students in department</li>
+                    <li>• Access to all students in college</li>
                   </>
                 )}
                 {selectedUser.role === 'PROGRAM_COORDINATOR' && (

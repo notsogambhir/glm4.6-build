@@ -39,13 +39,6 @@ export async function GET(request: NextRequest) {
             code: true
           }
         },
-        department: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        },
         _count: {
           select: {
             batches: true,
@@ -84,7 +77,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { name, code, collegeId, departmentId, duration, description } = await request.json();
+    const { name, code, collegeId, duration, description } = await request.json();
 
     if (!name || !code || !collegeId || !duration) {
       return NextResponse.json(
@@ -118,29 +111,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Auto-assign department if not provided (since each college has exactly one department)
-    let finalDepartmentId = departmentId;
-    if (!finalDepartmentId) {
-      const department = await db.department.findFirst({
-        where: { collegeId }
-      });
-      finalDepartmentId = department?.id || null;
-    }
-
-    // Check if department exists (if provided)
-    if (finalDepartmentId) {
-      const department = await db.department.findUnique({
-        where: { id: finalDepartmentId }
-      });
-
-      if (!department) {
-        return NextResponse.json(
-          { error: 'Department not found' },
-          { status: 404 }
-        );
-      }
-    }
-
     // Check if program with same name or code already exists in this college
     const existingProgram = await db.program.findFirst({
       where: {
@@ -164,19 +134,11 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         code: code.trim().toUpperCase(),
         collegeId,
-        departmentId: finalDepartmentId || null,
         duration: parseInt(duration),
         description: description?.trim() || null
       },
       include: {
         college: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        },
-        department: {
           select: {
             id: true,
             name: true,

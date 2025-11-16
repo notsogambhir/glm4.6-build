@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
-    const departmentId = searchParams.get('departmentId');
     const programId = searchParams.get('programId');
     const includeStudents = searchParams.get('includeStudents') === 'true';
 
@@ -27,10 +26,6 @@ export async function GET(request: NextRequest) {
 
     if (role) {
       whereClause.role = role;
-    }
-
-    if (departmentId) {
-      whereClause.departmentId = departmentId;
     }
 
     if (programId) {
@@ -74,12 +69,6 @@ export async function GET(request: NextRequest) {
     const users = await db.user.findMany({
       where: whereClause,
       include: {
-        department: {
-          select: {
-            name: true,
-            code: true
-          }
-        },
         program: {
           select: {
             name: true,
@@ -95,17 +84,6 @@ export async function GET(request: NextRequest) {
           select: {
             name: true,
             code: true
-          }
-        },
-        userDepartments: {
-          include: {
-            department: {
-              select: {
-                id: true,
-                name: true,
-                code: true
-              }
-            }
           }
         }
       },
@@ -145,8 +123,6 @@ export async function POST(request: NextRequest) {
       password,
       role,
       collegeId,
-      departmentId,
-      departmentIds,
       programId
     } = body;
 
@@ -223,17 +199,10 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         role,
         collegeId: finalCollegeId || null,
-        departmentId: departmentId || null, // Keep for backward compatibility
         programId: programId || null,
         isActive: true
       },
       include: {
-        department: {
-          select: {
-            name: true,
-            code: true
-          }
-        },
         program: {
           select: {
             name: true,
@@ -245,73 +214,9 @@ export async function POST(request: NextRequest) {
             name: true,
             code: true
           }
-        },
-        userDepartments: {
-          include: {
-            department: {
-              select: {
-                id: true,
-                name: true,
-                code: true
-              }
-            }
-          }
         }
       }
     });
-
-    // Handle multiple department assignments for teachers
-    if (role === 'TEACHER' && departmentIds && departmentIds.length > 0) {
-      const userDepartmentData = departmentIds.map((deptId: string) => ({
-        userId: newUser.id,
-        departmentId: deptId,
-        isActive: true
-      }));
-
-      await db.userDepartment.createMany({
-        data: userDepartmentData
-      });
-
-      // Fetch the updated user with departments
-      const updatedUser = await db.user.findUnique({
-        where: { id: newUser.id },
-        include: {
-          department: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          program: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          college: {
-            select: {
-              name: true,
-              code: true
-            }
-          },
-          userDepartments: {
-            include: {
-              department: {
-                select: {
-                  id: true,
-                  name: true,
-                  code: true
-                }
-              }
-            }
-          }
-        }
-      });
-
-      // Remove password from response
-      const { password: _, ...userWithoutPassword } = updatedUser!;
-      return NextResponse.json(userWithoutPassword, { status: 201 });
-    }
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = newUser;

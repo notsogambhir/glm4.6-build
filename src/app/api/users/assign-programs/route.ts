@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     const targetUser = await db.user.findUnique({
       where: { id: userId },
       include: {
-        department: true,
         program: true
       }
     });
@@ -55,27 +54,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For department users, verify they can only assign programs from their department
+    // For department users, verify they can only assign programs from their college
     if (user.role === 'DEPARTMENT') {
-      // Verify all programs belong to the user's department
+      // Verify all programs belong to the user's college
       const programs = await db.program.findMany({
         where: {
           id: { in: programIds },
-          departmentId: user.departmentId
+          collegeId: user.collegeId
         }
       });
 
       if (programs.length !== programIds.length) {
         return NextResponse.json(
-          { error: 'You can only assign programs from your department' },
+          { error: 'You can only assign programs from your college' },
           { status: 403 }
         );
       }
 
-      // Verify target user is in the same department
-      if (targetUser.departmentId !== user.departmentId) {
+      // Verify target user is in the same college
+      if (targetUser.collegeId !== user.collegeId) {
         return NextResponse.json(
-          { error: 'You can only assign programs to coordinators in your department' },
+          { error: 'You can only assign programs to coordinators in your college' },
           { status: 403 }
         );
       }
@@ -108,12 +107,6 @@ export async function POST(request: NextRequest) {
         batchId: null
       },
       include: {
-        department: {
-          select: {
-            name: true,
-            code: true
-          }
-        },
         program: {
           select: {
             name: true,

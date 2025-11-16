@@ -7,7 +7,6 @@ export interface DbUser {
   name: string;
   role: string;
   collegeId: string | null;
-  departmentId: string | null;
   programId: string | null;
   batchId: string | null;
   isActive: boolean;
@@ -22,7 +21,6 @@ export interface AuthUser {
   name: string;
   role: string;
   collegeId: string | null;
-  departmentId: string | null;
   programId: string | null;
   batchId: string | null;
 }
@@ -34,7 +32,6 @@ export interface User {
   name: string;
   role: string;
   collegeId?: string;
-  departmentId?: string;
   programId?: string;
   batchId?: string;
 }

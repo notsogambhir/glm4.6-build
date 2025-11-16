@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { StudentManagementDepartment } from '@/components/student-management-department';
 import { StudentManagementProgramCoordinator } from '@/components/student-management-program-coordinator';
 import { StudentManagementTeacher } from '@/components/student-management-teacher';
 import { StudentManagementAdmin } from '@/components/student-management-admin';
@@ -17,16 +16,17 @@ export default function StudentsPage() {
   switch (user.role) {
     case 'ADMIN':
     case 'UNIVERSITY':
-      // Admin and University users can view and manage all students across all colleges/departments
+      // Admin and University users can view and manage all students across all colleges
       return (
         <div className="p-6">
           <StudentManagementAdmin user={user} />
         </div>
       );
     case 'DEPARTMENT':
+      // Department users can view and manage students from their college
       return (
         <div className="p-6">
-          <StudentManagementDepartment user={user} />
+          <StudentManagementAdmin user={user} />
         </div>
       );
     case 'PROGRAM_COORDINATOR':

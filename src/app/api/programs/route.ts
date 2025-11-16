@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
         code: true,
         duration: true,
         description: true,
-        departmentId: true,
       },
       orderBy: { name: 'asc' },
     });

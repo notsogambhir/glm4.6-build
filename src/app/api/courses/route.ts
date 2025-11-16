@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     
     // Get the authenticated user to check permissions
     const user = await getUserFromRequest(request);
-    console.log('Authenticated user:', user ? { id: user.id, role: user.role, batchId: user.batchId, collegeId: user.collegeId, departmentId: user.departmentId, programId: user.programId } : 'null');
+    console.log('Authenticated user:', user ? { id: user.id, role: user.role, batchId: user.batchId, collegeId: user.collegeId, programId: user.programId } : 'null');
     
     let courses;
     let coursesCount = 0;
@@ -142,12 +142,12 @@ export async function GET(request: NextRequest) {
           break;
           
         case 'DEPARTMENT':
-          // Department users can see courses from their department's programs
+          // Department users can see courses from their college's programs
           courses = await db.course.findMany({
             where: {
               batch: {
                 program: {
-                  departmentId: user.departmentId
+                  collegeId: user.collegeId
                 }
               }
             },

@@ -25,7 +25,6 @@ const authUserToUser = (authUser: AuthUser | null): User | null => {
     name: authUser.name,
     role: authUser.role,
     collegeId: authUser.collegeId || undefined,
-    departmentId: authUser.departmentId || undefined,
     programId: authUser.programId || undefined,
     batchId: authUser.batchId || undefined,
   };
