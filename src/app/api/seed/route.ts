@@ -4,9 +4,25 @@ import { hashPassword } from '@/lib/auth';
 
 export async function POST() {
   try {
-    // Clean existing data
+    // Clean existing data in correct order (respect foreign key constraints)
+    // Start from the most dependent tables
+    await db.studentMark.deleteMany({});
+    await db.cOAttainment.deleteMany({});
+    await db.enrollment.deleteMany({});
+    await db.questionCOMapping.deleteMany({});
+    await db.question.deleteMany({});
+    await db.assessment.deleteMany({});
+    await db.cOPOMapping.deleteMany({});
+    await db.cO.deleteMany({});
+    await db.course.deleteMany({});
+    await db.userDepartment.deleteMany({});
     await db.user.deleteMany({});
+    await db.batch.deleteMany({});
+    await db.program.deleteMany({});
+    await db.department.deleteMany({});
     await db.college.deleteMany({});
+    await db.pO.deleteMany({});
+    await db.pEO.deleteMany({});
     
     // Create colleges
     const colleges = await Promise.all([
